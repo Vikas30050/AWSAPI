@@ -1,0 +1,76 @@
+Date -> 24-May-2023     Time -> 11:38:04.111
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Station historical data as per selection criteria
+Exception Message -> Cannot find table 0.
+-----------------------------------------------------------------------------------------------------
+
+Date -> 27-May-2023     Time -> 11:02:02.375
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Station historical data as per selection criteria
+Exception Message -> Index was outside the bounds of the array.
+-----------------------------------------------------------------------------------------------------
+
+Date -> 27-May-2023     Time -> 11:03:00.938
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Station historical data as per selection criteria
+Exception Message -> Index was outside the bounds of the array.
+-----------------------------------------------------------------------------------------------------
+
+Date -> 27-May-2023     Time -> 15:09:01.256
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Historical Data
+Exception Message -> Value cannot be null.
+Parameter name: str
+-----------------------------------------------------------------------------------------------------
+
+Date -> 27-May-2023     Time -> 15:09:21.687
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Historical Data
+Exception Message -> Value cannot be null.
+Parameter name: str
+-----------------------------------------------------------------------------------------------------
+
+Date -> 27-May-2023     Time -> 17:55:33.122
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Historical Data
+Exception Message -> Value cannot be null.
+Parameter name: str
+-----------------------------------------------------------------------------------------------------
+
+Date -> 28-May-2023     Time -> 13:11:01.634
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Historical Data
+Exception Message -> Index was outside the bounds of the array.
+-----------------------------------------------------------------------------------------------------
+
+Date -> 28-May-2023     Time -> 13:45:58.103
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Historical Data
+Exception Message -> Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+-----------------------------------------------------------------------------------------------------
+
+Date -> 28-May-2023     Time -> 14:04:45.989
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Historical Data
+Exception Message -> String was not recognized as a valid DateTime.
+-----------------------------------------------------------------------------------------------------
+
+Date -> 28-May-2023     Time -> 14:04:48.100
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Historical Data
+Exception Message -> String was not recognized as a valid DateTime.
+-----------------------------------------------------------------------------------------------------
+
+Date -> 28-May-2023     Time -> 18:00:55.809
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Station historical data as per selection criteria
+Exception Message -> Index was outside the bounds of the array.
+-----------------------------------------------------------------------------------------------------
+
+Date -> 28-May-2023     Time -> 18:07:45.116
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Station historical data as per selection criteria
+Exception Message -> Index was outside the bounds of the array.
+-----------------------------------------------------------------------------------------------------
+
