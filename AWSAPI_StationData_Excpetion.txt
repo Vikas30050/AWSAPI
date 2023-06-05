@@ -74,3 +74,27 @@ Function Name -> Get Station historical data as per selection criteria
 Exception Message -> Index was outside the bounds of the array.
 -----------------------------------------------------------------------------------------------------
 
+Date -> 29-May-2023     Time -> 15:49:14.402
+Module Name -> Send AWS Data to All Client
+Function Name -> Remove 15 min Summation
+Exception Message -> There is no row at position 0.
+-----------------------------------------------------------------------------------------------------
+
+Date -> 05-Jun-2023     Time -> 13:49:04.569
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Station Rain Summary Data
+Exception Message -> Column 'Hourly Rainfall' does not belong to table .
+-----------------------------------------------------------------------------------------------------
+
+Date -> 05-Jun-2023     Time -> 13:49:08.800
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Station Rain Summary Data
+Exception Message -> Column 'Hourly Rainfall' does not belong to table .
+-----------------------------------------------------------------------------------------------------
+
+Date -> 05-Jun-2023     Time -> 17:03:10.268
+Module Name -> Send AWS Data to All Client
+Function Name -> Get Station Rain Summary Data
+Exception Message -> Column 'Hourly Rainfall' does not belong to table .
+-----------------------------------------------------------------------------------------------------
+

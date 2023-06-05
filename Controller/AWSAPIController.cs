@@ -116,7 +116,6 @@ namespace AWSAPI
         }
 
         #region Station Summary Detail
-
         [HttpPost]
         [Route("stationdatadetail")]
         public async Task<HttpResponseMessage> GetStationDataDetail()
@@ -149,7 +148,6 @@ namespace AWSAPI
 
                 if (dsStationdetail.Tables.Count > 0)
                 {
-
                     if (dsStationdetail.Tables[0].Rows.Count > 0)
                     {
                         for (int s = 0; s < dsStationdetail.Tables[0].Rows.Count; s++)
@@ -187,8 +185,17 @@ namespace AWSAPI
                             //clsSD.centerLat = geoCoordinate.Latitude.ToString();
                             //clsSD.centerLng = geoCoordinate.Longitude.ToString();
 
-                            clsSD.centerLat = "22.464854547568365";
-                            clsSD.centerLng = "73.31506468355656";
+                            //Change by vikas ---> 2023-05-29....
+                            if (Profile.ToLower().Contains("vmc"))
+                            {
+                                clsSD.centerLat = "22.464854547568365";
+                                clsSD.centerLng = "73.31506468355656";
+                            }
+                            else if(Profile.ToLower().Contains("forest-goa"))
+                            {
+                                clsSD.centerLat = "15.2993";
+                                clsSD.centerLng = "74.1240";
+                            }
 
                             clsSD.Status = OnOffStatus;
                             clsSD.Date = Convert.ToDateTime(dsStationdetail.Tables[0].Rows[s]["Date"]).ToString("dd/MM/yyyy");
@@ -500,7 +507,8 @@ namespace AWSAPI
                                 }
 
                                 clsParaSummaryDetail paraSummary3 = new clsParaSummaryDetail();
-                                paraSummary3.ParameterName = "Hourly Rain";
+                                //paraSummary3.ParameterName = "Hourly Rain";
+                                paraSummary3.ParameterName = "Last 24HR";
                                 paraSummary3.Type = "rain";
                                 paraSummary3.ParameterValue = HRain;
                                 paraSummary3.ParameterUnit = "mm";
@@ -766,6 +774,9 @@ namespace AWSAPI
                                                     {
                                                         if (finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws 10m1minavg") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws 10m3minavg") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws 10m10minavg") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("maxws 10m") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws daymax10m"))
                                                             currentData.WindSpeed = finalStr[s].paraDetails[p].ParameterValue.Trim();
+                                                        else
+                                                            currentData.WindSpeed = finalStr[s].paraDetails[p].ParameterValue.Trim();
+
                                                     }
                                                     else if (finalStr[s].paraDetails[p].ParameterName.ToLower().Contains("press"))
                                                         currentData.Pressure = finalStr[s].paraDetails[p].ParameterValue.Trim();
@@ -977,9 +988,6 @@ namespace AWSAPI
 
                                 if (StID == "BDC00003")
                                 {
-                                    //string CurrDate = "2023-03-16";
-                                    //DateTime time = DateTime.ParseExact("08:00", "HH:mm", CultureInfo.InvariantCulture);
-
                                     for (int s = 1; s < dsSTData.Tables[0].Rows.Count; s++)
                                     {
                                         string finalHR = "";
@@ -2764,8 +2772,6 @@ namespace AWSAPI
                         #endregion For calculate VMC-RainTotal....Modify by vikas --> 2022-07-14
                     }
 
-
-
                     string[] Parameters = dtUnit.Tables[0].Rows[0]["SensorName"].ToString().Split(',');
                     string[] Units = dtUnit.Tables[0].Rows[0]["unit"].ToString().Split(',');
 
@@ -2825,8 +2831,7 @@ namespace AWSAPI
                             //StationID,Station Name,Latitude,Longitude,Altitude,Date,Time,Battery Voltage,GPS,GPRS SIGNALSTRENGTH,TypeOfSystem,NoOfParameters,RainFall HealthStatus,Hourly Rainfall,Daily Rain,Air Temperature HealthStatus,Air Temperature,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity HealthStatus,Humidity,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection HealthStatus10m,WindDirection 10m,WindSpeed HealthStatus10m,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,MaxWindSpeed 10m,WindSpeed DayMax10m,Pressure HealthStatus,Atmospheric Pressure,WindDirection HealthStatus3m,WindDirection 3m,WindSpeed HealthStatus3m,WindSpeed 3m1minAvg,WindSpeed 3m3minAvg,WindSpeed 3m10minAvg,MaxWindSpeed 3m,WindSpeed DayMax3m,SoilTemperature HealthStatus10cm,SoilTemperature 10cm,SoilMoisture HealthStatus10cm,SoilMoisture 10cm,SoilTemperature HealthStatus30cm,SoilTemperature 30cm,SoilMoisture HealthStatus30cm,SoilMoisture 30cm,SoilTemperature HealthStatus70cm,SoilTemperature 70cm,SoilMoisture HealthStatus70cm,SoilMoisture 70cm,SoilTemperature HealthStatus100cm,SoilTemperature 100cm,SoilMoisture HealthStatus100cm,SoilMoisture 100cm,SolarRadiation HealthStatus,Sunshine Duration,Global Radiation,Radiation HealthStatus,Par Data,Evaporameter HealthStatus,Evaporameter,UVRadiation_a HealthStatus,UV Radiation_a,UVRadiation_b HealthStatus,UV Radiation_b,UV Index,VisibilitySensor HealthStatus,Visibility,SnowDepth HealthStatus,Snow Depth,SnowWater HealthStatus,Snow WaterEquivalent,WaterLevel HealthStatus,WaterLevel Measurement
                             //EliminatePara = "StationID,Station Name,Latitude,Longitude,Altitude,Date,Time,Battery Voltage,GPS,GPRS SIGNALSTRENGTH,TypeOfSystem,NoOfParameters,RainFall HealthStatus,Hourly Rainfall,Daily Rain,AirTemperature HealthStatus,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity HealthStatus,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection HealthStatus10m,WindSpeed HealthStatus10m,Pressure HealthStatus,WindDirection HealthStatus3m,WindDirection 3m,WindSpeed HealthStatus3m,WindSpeed 3m1minAvg,WindSpeed 3m3minAvg,WindSpeed 3m10minAvg,MaxWindSpeed 3m,WindSpeed DayMax3m,SoilTemperature HealthStatus10cm,SoilMoisture HealthStatus10cm,SoilTemperature HealthStatus30cm,SoilTemperature 30cm,SoilMoisture HealthStatus30cm,SoilMoisture 30cm,SoilTemperature HealthStatus70cm,SoilMoisture HealthStatus70cm,SoilTemperature HealthStatus100cm,SoilTemperature 100cm,SoilMoisture HealthStatus100cm,SoilMoisture 100cm,SolarRadiation HealthStatus,Sunshine Duration,Global Radiation,Radiation HealthStatus,Par Data,Evaporameter HealthStatus,Evaporameter,UVRadiation_a HealthStatus,UV Radiation_a,UVRadiation_b HealthStatus,UV Radiation_b,UV Index,VisibilitySensor HealthStatus,Visibility,SnowDepth HealthStatus,Snow Depth,SnowWater HealthStatus,Snow WaterEquivalent,WaterLevel HealthStatus,WaterLevel Measurement";
 
-                            EliminatePara = "Battery Voltage,Hourly Rainfall,Daily Rain,Air Temperature,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection 10m,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,MaxWindSpeed 10m,WindSpeed DayMax10m,Atmospheric Pressure,SoilTemperature 10cm,SoilMoisture 10cm,SoilTemperature 70cm,SoilMoisture 70cm";
-
+                            EliminatePara = "Battery Voltage,Hourly Rainfall,Daily Rain,Air Temperature,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,MaxWindSpeed 10m,WindSpeed DayMax10m,Atmospheric Pressure,SoilTemperature 10cm,SoilMoisture 10cm,SoilTemperature 70cm,SoilMoisture 70cm";
 
                             string[] arrElimatePara = EliminatePara.Split(',');
 
@@ -3536,8 +3541,8 @@ namespace AWSAPI
                     DateTime PreviousTm = Convert.ToDateTime(CurrTm).Subtract(new TimeSpan(0, 15, 0));
                     PreTm = PreviousTm.ToString("HH:mm");
 
-                    //string PreHRSelQry = "select Date,Time,[Hourly Rainfall] from tbl_StationData_" + StationID.Trim() + " with (nolock) Where Date = '" + DateTime.Now.Date.ToString("yyyy-MM-dd") + "' and Time = '" + PreTm + "'";
-                    string PreHRSelQry = "select Date,Time,[Hourly Rainfall] from tbl_StationData_" + StationID.Trim() + " with (nolock) Where Date = '2023-03-16' and Time = '" + PreTm + "'";
+                    string PreHRSelQry = "select Date,Time,[Hourly Rainfall] from tbl_StationData_" + StationID.Trim() + " with (nolock) Where Date = '" + DateTime.Now.Date.ToString("yyyy-MM-dd") + "' and Time = '" + PreTm + "'";
+                    //string PreHRSelQry = "select Date,Time,[Hourly Rainfall] from tbl_StationData_" + StationID.Trim() + " with (nolock) Where Date = '2023-03-16' and Time = '" + PreTm + "'";
 
                     DataSet dsPreHR = null;
                     for (int p = 0; p < 3; p++)
@@ -3562,10 +3567,10 @@ namespace AWSAPI
                 }
                 else if (CurrTm == "00:00")
                 {
-                    //DateTime PreDT = Convert.ToDateTime(dsRainSR.Tables[0].Rows[RowIndex]["Date"].ToString()).AddDays(-1);
-                    //string finalPreDT = PreDT.ToString("yyyy-MM-dd");
+                    DateTime PreDT = Convert.ToDateTime(dsRainSR.Tables[0].Rows[RowIndex]["Date"].ToString()).AddDays(-1);
+                    string finalPreDT = PreDT.ToString("yyyy-MM-dd");
 
-                    string finalPreDT = "2023-03-15";
+                    //string finalPreDT = "2023-03-15";
                     string fetchQry = "select Top 1 Date,Time, [Hourly Rainfall] from tbl_StationData_" + StationID.Trim() + " with(nolock) where Date = '" + finalPreDT + "' order by Time desc";
 
                     DataSet dsHR = null;
