@@ -134,14 +134,27 @@ namespace AWSAPI
                 string CurrDT = DateTime.Now.ToString("yyyy-MM-dd HH:MM:ss");
 
                 DataSet dsStationdetail = null;
-
-                for (int j = 0; j < 3; j++)
+                if(Profile == "VMC-AWS-GUJ")
                 {
-                    dsStationdetail = ObjDB.FetchData_GenericSummary("[AWSAPI].[GenericStationData]", Profile, StIDs, CurrDT, CurrDT, "Web");
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsStationdetail = ObjDB.FetchData_GenericSummary("[AWSAPI].[DemoGenericStationData]", Profile, StIDs, CurrDT, CurrDT, "Web");
 
-                    if (dsStationdetail.Tables.Count > 0)
-                        break;
-                    Thread.Sleep(1000);
+                        if (dsStationdetail.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+                }
+                else
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsStationdetail = ObjDB.FetchData_GenericSummary("[AWSAPI].[GenericStationData]", Profile, StIDs, CurrDT, CurrDT, "Web");
+
+                        if (dsStationdetail.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
                 }
 
                 string OnOffStatus = "Offline";
@@ -191,7 +204,7 @@ namespace AWSAPI
                                 clsSD.centerLat = "22.464854547568365";
                                 clsSD.centerLng = "73.31506468355656";
                             }
-                            else if(Profile.ToLower().Contains("forest-goa"))
+                            else if (Profile.ToLower().Contains("forest-goa"))
                             {
                                 clsSD.centerLat = "15.2993";
                                 clsSD.centerLng = "74.1240";
@@ -271,7 +284,15 @@ namespace AWSAPI
 
                                 //strParaAliasNm = strParaAliasNm.TrimEnd(',');
                                 List<string> lstParaAliasNm = strParaAliasNm.Split(',').ToList();
-                                lstParaAliasNm.RemoveAt(lstParaAliasNm.Count - 1);
+                                
+                                if(Profile == "VMC-AWS-GUJ")
+                                {
+                                    lstParaAliasNm.RemoveAt(lstParaAliasNm.Count - 2);
+                                }
+                                else
+                                {
+                                    lstParaAliasNm.RemoveAt(lstParaAliasNm.Count - 1);
+                                }
                                 List<string> lstDisplayColumn = dtDisplayColumn.Rows[0]["SensorName"].ToString().Split(',').ToList();
                                 List<string> lstGridColumn = dtDisplayColumn.Rows[0]["ShowInGrid"].ToString().Split(',').ToList();
                                 List<string> lstUnitColumn = dtDisplayColumn.Rows[0]["Unit"].ToString().Split(',').ToList();
@@ -280,13 +301,15 @@ namespace AWSAPI
                                 {
                                     if (lstGridColumn[c] == "1")
                                     {
-                                        if (lstDisplayColumn[c] != "StationID" && lstDisplayColumn[c] != "Date" && lstDisplayColumn[c] != "Time")
+                                        if (lstDisplayColumn[c] != "StationID" && lstDisplayColumn[c] != "Date" && lstDisplayColumn[c] != "Time" && lstDisplayColumn[c] != "Mobile" && lstDisplayColumn[c] != "WIND GUST" && lstDisplayColumn[c] != "WIND DIRECTION AT MAX WIND SPEED" && lstDisplayColumn[c] != "RAIN RATE")
                                         {
                                             if (lstDisplayColumn[c].ToString().ToLower().Contains("air temp"))
                                                 lstUnitColumn[c] = "°C";
                                             else if (lstDisplayColumn[c].ToString().ToLower().Contains("wind dir"))
                                                 lstUnitColumn[c] = "°";
-
+                                            else if (lstDisplayColumn[c].ToString().ToLower().Contains("high dir"))
+                                                if(Profile == "VMC-AWS-GUJ")
+                                                lstDisplayColumn[c] = "WIND DIRECTION AT MAX WIND SPEED";
                                             clsParaSummaryDetail paraSummary = new clsParaSummaryDetail();
                                             paraSummary.ParameterName = lstParaAliasNm[c].Trim(); //lstDisplayColumn[c].ToString();
                                             string paraType = funSensorType(lstDisplayColumn[c].ToString());
@@ -363,159 +386,6 @@ namespace AWSAPI
 
                         List<clsStationSummary> finalStr = JsonConvert.DeserializeObject<List<clsStationSummary>>(jString.Replace("?", "◦"));
 
-                        if (Profile == "VMC-NHP-GUJ")
-                        {
-                            //[A]  WindSpeed + WindDir....
-                            for (int i = 0; i < finalStr.Count; i++)
-                            {
-                                int WSWD = 0;
-
-                                for (int j = 0; j < finalStr[i].paraDetails.Count; j++)
-                                {
-                                    string paraDetail = finalStr[i].paraDetails[j].ParameterName.ToString();
-
-                                    if (paraDetail == "WS" || paraDetail == "WD")
-                                    {
-                                        WSWD++;
-                                    }
-                                    if (WSWD == 2)
-                                    {
-                                        WSWD = 0;
-
-                                        string WD = WindRoseData(finalStr[i].paraDetails[j].ParameterValue, finalStr[i].paraDetails[j - 1].ParameterValue);
-                                        finalStr[i].paraDetails[j - 1].ParameterName = WD != "" ? WD : "";
-                                        finalStr[i].paraDetails.RemoveAt(j);
-                                    }
-
-                                    if (paraDetail == "Bvolt")
-                                        finalStr[i].paraDetails.RemoveAt(j);
-                                    else if (paraDetail == "Daily Rain")
-                                        finalStr[i].paraDetails.RemoveAt(j);
-                                }
-
-                                //[B] Current Day...
-                                string CurrDayStartDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "08:00";
-                                string CurrDT = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
-
-                                string CurrDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
-                               ,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + finalStr[i].StationID.Trim() + " where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + CurrDayStartDT + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
-
-                                DataSet dsCurrDayTotal = null;
-
-                                for (int l = 0; l < 3; l++)
-                                {
-                                    dsCurrDayTotal = ObjDB.FetchDataset(CurrDayTotal, "web");
-                                    if (dsCurrDayTotal.Tables.Count > 0)
-                                        break;
-                                    Thread.Sleep(1000);
-                                }
-
-                                if (dsCurrDayTotal.Tables[0].Rows.Count > 0)
-                                {
-                                    string CurrentDay = dsCurrDayTotal.Tables[0].Rows[0][1].ToString();
-                                    clsParaSummaryDetail paraSummary = new clsParaSummaryDetail();
-                                    paraSummary.ParameterName = "CurrentDay";
-                                    paraSummary.Type = "currentday";
-                                    paraSummary.ParameterValue = CurrentDay;
-                                    paraSummary.ParameterUnit = "mm";
-                                    finalStr[i].paraDetails.Insert(0, paraSummary);
-                                }
-
-
-                                //[C] Last Day...
-                                string LastDayStartDT = DateTime.Now.Date.AddDays(-1).ToString("yyyy-MM-dd") + " " + "08:15";
-                                string LastCurrDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "08:00";
-
-                                string LastDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
-                               ,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + finalStr[i].StationID.Trim() + " where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + LastDayStartDT + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + LastCurrDT.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
-
-                                DataSet dsLastDayTotal = null;
-
-                                for (int l = 0; l < 3; l++)
-                                {
-                                    dsLastDayTotal = ObjDB.FetchDataset(LastDayTotal, "web");
-                                    if (dsLastDayTotal.Tables.Count > 0)
-                                        break;
-                                    Thread.Sleep(1000);
-                                }
-
-                                if (dsLastDayTotal.Tables[0].Rows.Count > 0)
-                                {
-                                    string LastDay = dsLastDayTotal.Tables[0].Rows[0][1].ToString();
-                                    clsParaSummaryDetail paraSummary1 = new clsParaSummaryDetail();
-                                    paraSummary1.ParameterName = "LastDay";
-                                    paraSummary1.Type = "lastday";
-                                    paraSummary1.ParameterValue = LastDay;
-                                    paraSummary1.ParameterUnit = "mm";
-                                    finalStr[i].paraDetails.Insert(1, paraSummary1);
-                                }
-
-
-                                //[D] Last15Min....
-                                string CurrDate = DateTime.Now.ToString("yyyy-MM-dd");
-                                string Last15Min = @"select Time,[Hourly Rainfall] from tbl_StationData_" + finalStr[i].StationID.Trim() + " with(nolock) where Date = '" + CurrDate.Trim() + "'";
-                                string Last15MinRain = "";
-                                DataSet dsLast15Min = null;
-
-                                for (int l = 0; l < 3; l++)
-                                {
-                                    dsLast15Min = ObjDB.FetchDataset(Last15Min, "web");
-                                    if (dsLast15Min.Tables.Count > 0)
-                                        break;
-                                    Thread.Sleep(1000);
-                                }
-
-                                if (dsLast15Min.Tables[0].Rows.Count > 0)
-                                {
-                                    //Pending TASK-[A]
-                                    //Implement Logic to remove 15 min summation from HourlyRainfall....
-                                    //string RemoveSumHR = funRemoveSummationHR(dsLast15Min, finalStr[i].StationID.Trim(), dsLast15Min.Tables[0].Rows.Count - 2);
-                                    Last15MinRain = dsLast15Min.Tables[0].Rows[dsLast15Min.Tables[0].Rows.Count - 2]["Hourly Rainfall"].ToString();
-                                    //Last15MinRain = RemoveSumHR;
-                                }
-
-                                clsParaSummaryDetail paraSummary2 = new clsParaSummaryDetail();
-                                paraSummary2.ParameterName = "Last15min";
-                                paraSummary2.Type = "last15min";
-                                paraSummary2.ParameterValue = Last15MinRain;
-                                paraSummary2.ParameterUnit = "mm";
-                                finalStr[i].paraDetails.Insert(2, paraSummary2);
-
-                                //Remove Hourly Rain first....
-                                finalStr[i].paraDetails.RemoveAt(3);
-
-                                //[E]Add Hourly Rainfall....
-                                string CurrDTm = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
-                                string yesterdayDTm = DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd HH:mm");
-                                string HRainQry = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
-                                ,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18, 2))) AS[MAXHOUR]  FROM tbl_StationData_" + finalStr[i].StationID.Trim() + " where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + yesterdayDTm + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + CurrDTm.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
-
-                                string HRain = "";
-                                DataSet HRdataSet = null;
-
-                                for (int l = 0; l < 3; l++)
-                                {
-                                    HRdataSet = ObjDB.FetchDataset(HRainQry, "web");
-                                    if (HRdataSet.Tables.Count > 0)
-                                        break;
-                                    Thread.Sleep(1000);
-                                }
-
-                                if (HRdataSet.Tables[0].Rows.Count > 0)
-                                {
-                                    HRain = HRdataSet.Tables[0].Rows[0][1].ToString();
-                                }
-
-                                clsParaSummaryDetail paraSummary3 = new clsParaSummaryDetail();
-                                //paraSummary3.ParameterName = "Hourly Rain";
-                                paraSummary3.ParameterName = "Last 24HR";
-                                paraSummary3.Type = "rain";
-                                paraSummary3.ParameterValue = HRain;
-                                paraSummary3.ParameterUnit = "mm";
-                                finalStr[i].paraDetails.Insert(3, paraSummary3);
-                            }
-                        }
-
                         clsJsonSuccess ObjJsonResp = new clsJsonSuccess();
                         ObjJsonResp.code = Convert.ToInt32(HttpStatusCode.OK);
                         ObjJsonResp.message = "success";
@@ -581,7 +451,7 @@ namespace AWSAPI
         #region Station DataMinMax Detail
 
         [HttpPost]
-        [Route("StDataMinMax")]
+        [Route("StDataMinMax")] 
         public async Task<HttpResponseMessage> PostFinalStationDataMinMax()
         {
             strFunctionName = "Send Station Data with MinMax detail Async";
@@ -647,13 +517,10 @@ namespace AWSAPI
 
                     for (int j = 0; j < 3; j++)
                     {
-                        if (StID == "BDC00003")
+                        dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
+                        if(ProfileName == "VMC-AWS-GUJ")
                         {
-                            dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, "2023-03-15", "2023-03-16", "", "Web");
-                        }
-                        else
-                        {
-                            dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
+                            dsSTData.Tables[0].Columns.Remove("Status");
                         }
 
                         if (dsSTData.Tables.Count > 0)
@@ -733,7 +600,7 @@ namespace AWSAPI
 
                                     for (int j = 0; j < 3; j++)
                                     {
-                                        dsSummaryData = ObjDB.FetchDataset("select * from AWSAPI.tbl_Summary with(nolock) where Profile='" + ProfileName.Trim() + "'", "Web");
+                                        dsSummaryData = ObjDB.FetchDataset("select * from AWSAPI.tbl_Summary with(nolock) where Profile='" + ProfileName.Trim() + "' ", "Web");
                                         if (dsSummaryData.Tables.Count > 0)
                                             break;
                                         Thread.Sleep(1000);
@@ -746,14 +613,17 @@ namespace AWSAPI
                                         List<clsStationSummary> finalStr = JsonConvert.DeserializeObject<List<clsStationSummary>>(jString.Replace("?", "◦"));
 
                                         clsCurrentData currentData = new clsCurrentData();
-                                        currentData.Time = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
                                         for (int s = 0; s < finalStr.Count; s++)
                                         {
                                             if (finalStr[s].StationID.Trim() == StID.Trim())
                                             {
+                                                currentData.Time = DateTime.Now.ToString("dd-MM-yyyy") + " " + finalStr[s].Time;
+
                                                 for (int p = 0; p < finalStr[s].paraDetails.Count; p++)
                                                 {
+
+
                                                     if (finalStr[s].paraDetails[p].ParameterName.ToLower().Contains("temp"))
                                                     {
                                                         if (!finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("temp min") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("temp max") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("temp dayminmax") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("soiltemp 10cm") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("soiltemp 70cm"))
@@ -772,9 +642,9 @@ namespace AWSAPI
                                                         currentData.Wind = finalStr[s].paraDetails[p].ParameterValue.Trim();
                                                     else if (finalStr[s].paraDetails[p].ParameterName.ToLower().Contains("ws"))
                                                     {
-                                                        if (finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws 10m1minavg") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws 10m3minavg") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws 10m10minavg") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("maxws 10m") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws daymax10m"))
+                                                        if (finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws 10m1minavg"))
                                                             currentData.WindSpeed = finalStr[s].paraDetails[p].ParameterValue.Trim();
-                                                        else
+                                                        else if (!finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws 10m3minavg") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws 10m10minavg") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("maxws 10m") && !finalStr[s].paraDetails[p].ParameterName.ToLower().Equals("ws daymax10m"))
                                                             currentData.WindSpeed = finalStr[s].paraDetails[p].ParameterValue.Trim();
 
                                                     }
@@ -803,26 +673,28 @@ namespace AWSAPI
 
                                 List<clsRainDetail> LstRainDetails = RainSummary(ProfileName, StID);
 
-                                clsRainDetail rainDetail = new clsRainDetail();
-                                rainDetail.CurrentDay = LstRainDetails[0].CurrentDay;
-                                rainDetail.LastDay = LstRainDetails[0].LastDay;
-                                rainDetail.Rain24HR = LstRainDetails[0].Rain24HR;
-                                rainDetail.LastHour = LstRainDetails[0].LastHour;
-                                rainDetail.MonthTotal = LstRainDetails[0].MonthTotal;
-                                rainDetail.YearTotal = LstRainDetails[0].YearTotal;
-                                rainDetail.CurrentRainRate = LstRainDetails[0].CurrentRainRate;
-                                rainDetail.StormDuration = LstRainDetails[0].StormDuration;
-                                rainDetail.StormRate = LstRainDetails[0].StormRate;
-                                rainDetail.StormUnit = "mm";
-                                rainDetail.StormStartDateTime = LstRainDetails[0].StormStartDateTime;
-                                rainDetail.RainUnit = "mm";
-                                stationGraph_rain.RainData = rainDetail;
-                                graphDetailList.Add(stationGraph_rain);
-
+                                if (LstRainDetails.Count > 0)
+                                {
+                                    clsRainDetail rainDetail = new clsRainDetail();
+                                    rainDetail.CurrentDay = LstRainDetails[0].CurrentDay;
+                                    rainDetail.LastDay = LstRainDetails[0].LastDay;
+                                    rainDetail.Rain24HR = LstRainDetails[0].Rain24HR;
+                                    rainDetail.LastHour = LstRainDetails[0].LastHour;
+                                    rainDetail.MonthTotal = LstRainDetails[0].MonthTotal;
+                                    rainDetail.YearTotal = LstRainDetails[0].YearTotal;
+                                    rainDetail.CurrentRainRate = LstRainDetails[0].CurrentRainRate;
+                                    rainDetail.StormDuration = LstRainDetails[0].StormDuration;
+                                    rainDetail.StormValue = LstRainDetails[0].StormValue;
+                                    rainDetail.StormUnit = "mm";
+                                    rainDetail.StormStartDateTime = LstRainDetails[0].StormStartDateTime;
+                                    rainDetail.RainUnit = "mm";
+                                    stationGraph_rain.RainData = rainDetail;
+                                    graphDetailList.Add(stationGraph_rain);
+                                }
                                 //--------------------------------------------------------------------------------------------------------------------
                             }
 
-                            if (ProfileName.Trim() != "VMC-NHP-GUJ")
+                            if (!ProfileName.Contains("VMC"))
                             {
                                 clsStationGraphDetail stationGraphCummRain = new clsStationGraphDetail();
                                 stationGraphCummRain.ParameterName = "Cummulative Rain";
@@ -970,7 +842,7 @@ namespace AWSAPI
                                     }
                                 }
                             }
-                            else if (ProfileName.Trim() == "VMC-NHP-GUJ")
+                            else if (ProfileName.Trim() == "VMC-AWS-GUJ")
                             {
                                 string[] columnNames = dsSTData.Tables[0].Columns.Cast<DataColumn>().Select(x => x.ColumnName).ToArray();
 
@@ -986,36 +858,47 @@ namespace AWSAPI
 
                                 //string[] strCumRainFinal = new string[dsSTData.Tables[0].Rows.Count];
 
-                                if (StID == "BDC00003")
+
+                                string CurrDate = DateTime.Now.ToString("yyyy-MM-dd");
+                                DateTime time = DateTime.ParseExact("08:00", "HH:mm", CultureInfo.InvariantCulture);
+
+                                for (int s = 0; s < dsSTData.Tables[0].Rows.Count; s++)
                                 {
-                                    for (int s = 1; s < dsSTData.Tables[0].Rows.Count; s++)
+                                    string finalHR = "";
+
+                                    string CurrTm = dsSTData.Tables[0].Rows[s]["Time"].ToString();
+                                    //string PreTm = "";
+                                    double DiffHR = 0;
+
+                                    //16:00
+                                    /*if (CurrTm != "00:00" && !CurrTm.Contains(":15"))
                                     {
-                                        string finalHR = "";
 
-                                        string CurrTm = dsSTData.Tables[0].Rows[s]["Time"].ToString();
-                                        double DiffHR = 0;
+                                        *//*DateTime PreviousTm = Convert.ToDateTime(CurrTm).Subtract(new TimeSpan(0, 15, 0));
+                                        PreTm = PreviousTm.ToString("HH:mm");
 
-                                        if (CurrTm != "00:00" && !CurrTm.Contains(":15"))
+                                        string PreHRSelQry = "select Date,Time,[Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " with (nolock) Where Date = '2023-03-16' and Time = '" + PreTm + "'";
+
+                                        DataSet dsPreHR = null;
+                                        for (int p = 0; p < 3; p++)
                                         {
-                                            DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsSTData.Tables[0].Rows[s - 1]["Hourly Rainfall"]);
-
-                                            if (DiffHR <= 0)
-                                                DiffHR = 000.0;
-
-                                            finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                                            dsPreHR = ObjDB.FetchDataset(PreHRSelQry, "web");
+                                            if (dsPreHR.Tables.Count > 0)
+                                                break;
+                                            Thread.Sleep(1000);
                                         }
-                                        else if (CurrTm.Contains(":15"))
-                                        {
-                                            DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]);
-                                            finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
-                                        }
-                                        else if (CurrTm == "00:00")
-                                        {
-                                            //DateTime PreDT = Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Date"].ToString()).AddDays(-1);
-                                            //string finalPreDT = PreDT.ToString("yyyy-MM-dd");
 
-                                            string finalPreDT = "2023-03-15";
-                                            string fetchQry = "select Top 1 Date,Time, [Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " with(nolock) where Date = '" + finalPreDT + "' order by Time desc";
+                                        DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsPreHR.Tables[0].Rows[0]["Hourly Rainfall"]);
+                                        *//*
+                                        if(s == 0)
+                                        {
+                                            DateTime DT = Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Date"].ToString());
+                                            string finalDT = DT.ToString("yyyy-MM-dd");
+
+                                            DateTime Tm = Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Time"].ToString()).AddMinutes(-15);
+                                            string finalTm = Tm.ToString("HH:mm");
+
+                                            string fetchQry = "select Top 1 Date,Time, [Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " with(nolock) where Date = '" + finalDT.Trim()  + "' and Time = '" + finalTm + "' order by Time desc";
 
                                             DataSet dsHR = null;
 
@@ -1026,87 +909,302 @@ namespace AWSAPI
                                                     break;
                                                 Thread.Sleep(1000);
                                             }
+                                        }
+                                        else
+                                            DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsSTData.Tables[0].Rows[s - 1]["Hourly Rainfall"]);
 
-                                            DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsHR.Tables[0].Rows[0]["Hourly Rainfall"]);
+                                        if (DiffHR <= 0)
+                                            DiffHR = 000.0;
 
-                                            if (DiffHR <= 0)
-                                                DiffHR = 000.0;
+                                        finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                                    }
+                                    else if (CurrTm.Contains(":15"))
+                                    {
+                                        DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]);
+                                        finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                                    }
+                                    else if (CurrTm == "00:00")
+                                    {
+                                        DateTime PreDT = Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Date"].ToString()).AddDays(-1);
+                                        string finalPreDT = PreDT.ToString("yyyy-MM-dd");
 
-                                            finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                                        string fetchQry = "select Top 1 Date,Time, [Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " with(nolock) where Date = '" + finalPreDT + "' order by Time desc";
+
+                                        DataSet dsHR = null;
+
+                                        for (int h = 0; h < 3; h++)
+                                        {
+                                            dsHR = ObjDB.FetchDataset(fetchQry, "web");
+                                            if (dsHR.Tables.Count > 0)
+                                                break;
+                                            Thread.Sleep(1000);
                                         }
 
-                                        //strCumRainFinal[s] = dsSTData.Tables[0].Rows[s]["Date"].ToString() + " , "  + dsSTData.Tables[0].Rows[s]["Time"].ToString() + " , " +  finalHR + " , " + dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
+                                        DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsHR.Tables[0].Rows[0]["Hourly Rainfall"]);
 
-                                        clsGraphData graphData = new clsGraphData();
-                                        graphData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
-                                        graphData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
-                                        graphData.ParameterValue = dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString(); //finalHR;
-                                        graphData.ParameterUnit = "mm";
-                                        LstgraphCummData.Add(graphData);
-                                        stationGraphCummRain.GraphData = LstgraphCummData;
+                                        if (DiffHR <= 0)
+                                            DiffHR = 000.0;
 
+                                        finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                                    }*/
+
+                                    //strCumRainFinal[s] = dsSTData.Tables[0].Rows[s]["Date"].ToString() + " , "  + dsSTData.Tables[0].Rows[s]["Time"].ToString() + " , " +  finalHR + " , " + dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
+
+                                    clsGraphData graphData = new clsGraphData();
+                                    graphData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
+                                    graphData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
+                                    graphData.ParameterValue = dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString(); //finalHR;
+                                    graphData.ParameterUnit = "mm";
+                                    LstgraphCummData.Add(graphData);
+                                    stationGraphCummRain.GraphData = LstgraphCummData;
+
+                                    // if (dsSTData.Tables[0].Rows[s]["Date"].ToString() == CurrDate && Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Time"]) >= time)
+                                    // {
+
+                                    clsGraphData graphBarData = new clsGraphData();
+                                    graphBarData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
+                                    graphBarData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
+                                    //Cummulative Rain...
+                                    graphBarData.ParameterValue = finalHR; //dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
+                                    graphBarData.ParameterUnit = "mm";
+                                    LstgraphBarCummData.Add(graphBarData);
+                                    stationGraphCummRain.GraphBarData = LstgraphBarCummData;
+
+                                    // }
+                                }
+
+
+                                /*
+                                for (int s = 0; s < dsSTData.Tables[0].Rows.Count; s++)
+                                {
+                                    clsGraphData graphData = new clsGraphData();
+                                    graphData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
+                                    graphData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
+
+                                    //REMAINING TASK - [B]....
+                                    //Implement Logic of Remove 15min summation for converting [Hourly Rainfall] to (15minRainfall)...
+
+                                    string RemoveSumHR = funRemoveSummationHR(dsSTData, StID, s);
+
+                                    graphData.ParameterValue = RemoveSumHR;
+
+                                    //graphData.ParameterValue = dsSTData.Tables[0].Rows[s]["Hourly Rainfall"].ToString();
+
+                                    graphData.ParameterUnit = "mm";
+                                    LstgraphCummData.Add(graphData);
+                                    stationGraphCummRain.GraphData = LstgraphCummData;
+
+                                    if (dsSTData.Tables[0].Rows[s]["Date"].ToString() == CurrDate && Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Time"]) >= time)
+                                    {
                                         clsGraphData graphBarData = new clsGraphData();
                                         graphBarData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
                                         graphBarData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
+
                                         //Cummulative Rain...
-                                        graphBarData.ParameterValue = finalHR; //dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
+                                        graphBarData.ParameterValue = dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
                                         graphBarData.ParameterUnit = "mm";
                                         LstgraphBarCummData.Add(graphBarData);
                                         stationGraphCummRain.GraphBarData = LstgraphBarCummData;
                                     }
+
                                 }
-                                else
+                                */
+
+                                graphDetailList.Add(stationGraphCummRain);
+
+                                finalcolList.Add("Dew Point");
+                                finalcolList.Add("Wind Run");
+                                finalcolList.Add("Wind Chill");
+                                finalcolList.Add("Heat Index");
+                                finalcolList.Add("THW Index");
+
+                                //"Dew Point","Wind Run","Wind Chill","Heat Index","THW Index"
+                                stUnit += "°C,m,(kgcal/m2/h),°C,°C";
+
+                                List<string> NewUnit1 = stUnit.Split(',').ToList();
+                                NewUnit1.RemoveAt(3);
+                                DataTable reportDT = funVMCDataSet(StID, frDT, toDT, status);
+
+                                DataSet reportMin = funMinVal(reportDT, StID, frDT, toDT, status);
+
+                                DataSet reportMax = funMaxVal(reportDT, StID, frDT, toDT, status);
+
+                                if (reportDT.Rows.Count > 0)
                                 {
-                                    string CurrDate = DateTime.Now.ToString("yyyy-MM-dd");
-                                    DateTime time = DateTime.ParseExact("08:00", "HH:mm", CultureInfo.InvariantCulture);
-
-                                    for (int s = 1; s < dsSTData.Tables[0].Rows.Count; s++)
+                                    for (int c = 3; c < reportDT.Columns.Count; c++)
                                     {
-                                        string finalHR = "";
-
-                                        string CurrTm = dsSTData.Tables[0].Rows[s]["Time"].ToString();
-                                        //string PreTm = "";
-                                        double DiffHR = 0;
-
-                                        if (CurrTm != "00:00" && !CurrTm.Contains(":15"))
+                                        
+                                        if (finalcolList[c] != "15mins RAINFALL" && finalcolList[c] != "Daily Rain" && finalcolList[c] != "HIGH DIRECTION" && finalcolList[c] != "WIND GUST"  && finalcolList[c] != "RAIN RATE")
                                         {
-
-                                            /*DateTime PreviousTm = Convert.ToDateTime(CurrTm).Subtract(new TimeSpan(0, 15, 0));
-                                            PreTm = PreviousTm.ToString("HH:mm");
-
-                                            string PreHRSelQry = "select Date,Time,[Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " with (nolock) Where Date = '2023-03-16' and Time = '" + PreTm + "'";
-
-                                            DataSet dsPreHR = null;
-                                            for (int p = 0; p < 3; p++)
+                                            if (finalcolList[c] == "Wind Speed")
                                             {
-                                                dsPreHR = ObjDB.FetchDataset(PreHRSelQry, "web");
-                                                if (dsPreHR.Tables.Count > 0)
-                                                    break;
-                                                Thread.Sleep(1000);
+                                                clsStationGraphDetail stationGraphDetail = new clsStationGraphDetail();
+
+                                                stationGraphDetail.ParameterName = finalcolList[c];
+                                                stationGraphDetail.GraphType = "Bar";
+
+                                                string type = funSensorType(finalcolList[c]);
+                                                stationGraphDetail.Type = type;
+
+                                                stationGraphDetail.xAxisTitle = "Time";
+                                                stationGraphDetail.yAxisTile = finalcolList[c].Trim();
+
+                                                stationGraphDetail.MinDate = reportMin.Tables[0].Rows[c - 3][0].ToString();
+                                                stationGraphDetail.MinTime = reportMin.Tables[0].Rows[c - 3][1].ToString();
+                                                stationGraphDetail.MinValue = reportMin.Tables[0].Rows[c - 3][2].ToString();
+
+                                                stationGraphDetail.MaxDate = reportMax.Tables[0].Rows[c - 3][0].ToString();
+                                                stationGraphDetail.MaxTime = reportMax.Tables[0].Rows[c - 3][1].ToString();
+                                                stationGraphDetail.MaxValue = reportMax.Tables[0].Rows[c - 3][2].ToString();
+
+                                                List<clsGraphData> LstgraphBarData = new List<clsGraphData>();
+                                                List<clsGraphData> LstgraphBarDataWG = new List<clsGraphData>();
+
+                                                for (int r = 0; r < reportDT.Rows.Count; r++)
+                                                {
+                                                    clsGraphData graphBarData = new clsGraphData();
+                                                    graphBarData.Date = reportDT.Rows[r]["Date"].ToString();
+                                                    graphBarData.Time = reportDT.Rows[r]["Time"].ToString();
+                                                    graphBarData.ParameterValue = reportDT.Rows[r][c].ToString();
+                                                    graphBarData.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
+                                                    LstgraphBarData.Add(graphBarData);
+
+                                                    stationGraphDetail.GraphBarData = LstgraphBarData;
+
+                                                    clsGraphData graphBarDataWG = new clsGraphData();
+                                                    graphBarDataWG.Date = reportDT.Rows[r]["Date"].ToString();
+                                                    graphBarDataWG.Time = reportDT.Rows[r]["Time"].ToString();
+
+                                                    //Change by vikas --> 10-Mar-2023
+                                                    if (reportDT.Rows[r][c].ToString().Contains("--"))
+                                                    {
+                                                        reportDT.Rows[r][c] = "00.0";
+                                                    }
+
+                                                    graphBarDataWG.ParameterValue = reportDT.Rows[r]["WIND GUST"].ToString(); 
+                                                    graphBarDataWG.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
+                                                    LstgraphBarDataWG.Add(graphBarDataWG);
+
+                                                    stationGraphDetail.GraphBarDataWG = LstgraphBarDataWG;
+                                                }
+
+                                                graphDetailList.Add(stationGraphDetail);
+
                                             }
+                                            else
+                                            {
+                                                clsStationGraphDetail stationGraphDetail = new clsStationGraphDetail();
+                                                stationGraphDetail.ParameterName = finalcolList[c];
+                                                stationGraphDetail.GraphType = "Line";
 
-                                            DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsPreHR.Tables[0].Rows[0]["Hourly Rainfall"]);
-                                            */
+                                                string type = funSensorType(finalcolList[c]);
+                                                stationGraphDetail.Type = type;
+
+                                                stationGraphDetail.xAxisTitle = "Time";
+                                                stationGraphDetail.yAxisTile = finalcolList[c].Trim();
+
+                                                if (!finalcolList[c].ToLower().Contains("direction"))
+                                                {
+                                                    stationGraphDetail.MinDate = reportMin.Tables[0].Rows[c - 3][0].ToString();
+                                                    stationGraphDetail.MinTime = reportMin.Tables[0].Rows[c - 3][1].ToString();
+                                                    stationGraphDetail.MinValue = reportMin.Tables[0].Rows[c - 3][2].ToString();
+
+                                                    stationGraphDetail.MaxDate = reportMax.Tables[0].Rows[c - 3][0].ToString();
+                                                    stationGraphDetail.MaxTime = reportMax.Tables[0].Rows[c - 3][1].ToString();
+                                                    stationGraphDetail.MaxValue = reportMax.Tables[0].Rows[c - 3][2].ToString();
+                                                }
+                                                else
+                                                {
+                                                    stationGraphDetail.MinDate = "";
+                                                    stationGraphDetail.MinTime = "";
+                                                    stationGraphDetail.MinValue = "";
+
+                                                    stationGraphDetail.MaxDate = "";
+                                                    stationGraphDetail.MaxTime = "";
+                                                    stationGraphDetail.MaxValue = "";
+                                                }
 
 
-                                            DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsSTData.Tables[0].Rows[s - 1]["Hourly Rainfall"]);
+                                                List<clsGraphData> LstgraphData = new List<clsGraphData>();
 
-                                            if (DiffHR <= 0)
-                                                DiffHR = 000.0;
+                                                for (int r = 0; r < reportDT.Rows.Count; r++)
+                                                {
+                                                    clsGraphData graphData = new clsGraphData();
+                                                    graphData.Date = reportDT.Rows[r]["Date"].ToString();
+                                                    graphData.Time = reportDT.Rows[r]["Time"].ToString();
+                                                    graphData.ParameterValue = reportDT.Rows[r][c].ToString();
+                                                    graphData.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
+                                                    LstgraphData.Add(graphData);
 
-                                            finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                                                    stationGraphDetail.GraphData = LstgraphData;
+                                                }
+
+                                                graphDetailList.Add(stationGraphDetail);
+
+                                            }
                                         }
-                                        else if (CurrTm.Contains(":15"))
-                                        {
-                                            DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]);
-                                            finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
-                                        }
-                                        else if (CurrTm == "00:00")
-                                        {
-                                            DateTime PreDT = Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Date"].ToString()).AddDays(-1);
-                                            string finalPreDT = PreDT.ToString("yyyy-MM-dd");
+                                    }
 
-                                            string fetchQry = "select Top 1 Date,Time, [Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " with(nolock) where Date = '" + finalPreDT + "' order by Time desc";
+                                }
+                            }
+                            else if(ProfileName.Trim() == "VMC-NHP-GUJ")
+                            {
+                                string[] columnNames = dsSTData.Tables[0].Columns.Cast<DataColumn>().Select(x => x.ColumnName).ToArray();
+
+                                List<string> finalcolList = columnNames.ToList();
+
+                                clsStationGraphDetail stationGraphCummRain = new clsStationGraphDetail();
+                                stationGraphCummRain.ParameterName = "Cummulative Rain";
+                                stationGraphCummRain.Type = "rain";
+                                stationGraphCummRain.GraphType = "both";
+
+                                List<clsGraphData> LstgraphCummData = new List<clsGraphData>();
+                                List<clsGraphData> LstgraphBarCummData = new List<clsGraphData>();
+
+                                //string[] strCumRainFinal = new string[dsSTData.Tables[0].Rows.Count];
+
+
+                                string CurrDate = DateTime.Now.ToString("yyyy-MM-dd");
+                                DateTime time = DateTime.ParseExact("08:00", "HH:mm", CultureInfo.InvariantCulture);
+
+                                for (int s = 0; s < dsSTData.Tables[0].Rows.Count; s++)
+                                {
+                                    string finalHR = "";
+
+                                    string CurrTm = dsSTData.Tables[0].Rows[s]["Time"].ToString();
+                                    //string PreTm = "";
+                                    double DiffHR = 0;
+
+                                    //16:00
+                                    if (CurrTm != "00:00" && !CurrTm.Contains(":15"))
+                                    {
+
+                                        /*DateTime PreviousTm = Convert.ToDateTime(CurrTm).Subtract(new TimeSpan(0, 15, 0));
+                                        PreTm = PreviousTm.ToString("HH:mm");
+
+                                        string PreHRSelQry = "select Date,Time,[Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " with (nolock) Where Date = '2023-03-16' and Time = '" + PreTm + "'";
+
+                                        DataSet dsPreHR = null;
+                                        for (int p = 0; p < 3; p++)
+                                        {
+                                            dsPreHR = ObjDB.FetchDataset(PreHRSelQry, "web");
+                                            if (dsPreHR.Tables.Count > 0)
+                                                break;
+                                            Thread.Sleep(1000);
+                                        }
+
+                                        DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsPreHR.Tables[0].Rows[0]["Hourly Rainfall"]);
+                                        */
+
+                                        if (s == 0)
+                                        {
+                                            DateTime DT = Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Date"].ToString());
+                                            string finalDT = DT.ToString("yyyy-MM-dd");
+
+                                            DateTime Tm = Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Time"].ToString()).AddMinutes(-15);
+                                            string finalTm = Tm.ToString("HH:mm");
+
+                                            string fetchQry = "select Top 1 Date,Time, [Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " with(nolock) where Date = '" + finalDT.Trim() + "' and Time = '" + finalTm + "' order by Time desc";
 
                                             DataSet dsHR = null;
 
@@ -1117,40 +1215,70 @@ namespace AWSAPI
                                                     break;
                                                 Thread.Sleep(1000);
                                             }
+                                        }
+                                        else
+                                            DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsSTData.Tables[0].Rows[s - 1]["Hourly Rainfall"]);
 
-                                            DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsHR.Tables[0].Rows[0]["Hourly Rainfall"]);
+                                        if (DiffHR <= 0)
+                                            DiffHR = 000.0;
 
-                                            if (DiffHR <= 0)
-                                                DiffHR = 000.0;
+                                        finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                                    }
+                                    else if (CurrTm.Contains(":15"))
+                                    {
+                                        DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]);
+                                        finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                                    }
+                                    else if (CurrTm == "00:00")
+                                    {
+                                        DateTime PreDT = Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Date"].ToString()).AddDays(-1);
+                                        string finalPreDT = PreDT.ToString("yyyy-MM-dd");
 
-                                            finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                                        string fetchQry = "select Top 1 Date,Time, [Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " with(nolock) where Date = '" + finalPreDT + "' order by Time desc";
+
+                                        DataSet dsHR = null;
+
+                                        for (int h = 0; h < 3; h++)
+                                        {
+                                            dsHR = ObjDB.FetchDataset(fetchQry, "web");
+                                            if (dsHR.Tables.Count > 0)
+                                                break;
+                                            Thread.Sleep(1000);
                                         }
 
-                                        //strCumRainFinal[s] = dsSTData.Tables[0].Rows[s]["Date"].ToString() + " , "  + dsSTData.Tables[0].Rows[s]["Time"].ToString() + " , " +  finalHR + " , " + dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
+                                        DiffHR = Convert.ToDouble(dsSTData.Tables[0].Rows[s]["Hourly Rainfall"]) - Convert.ToDouble(dsHR.Tables[0].Rows[0]["Hourly Rainfall"]);
 
-                                        clsGraphData graphData = new clsGraphData();
-                                        graphData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
-                                        graphData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
-                                        graphData.ParameterValue = dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString(); //finalHR;
-                                        graphData.ParameterUnit = "mm";
-                                        LstgraphCummData.Add(graphData);
-                                        stationGraphCummRain.GraphData = LstgraphCummData;
+                                        if (DiffHR <= 0)
+                                            DiffHR = 000.0;
 
-                                        // if (dsSTData.Tables[0].Rows[s]["Date"].ToString() == CurrDate && Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Time"]) >= time)
-                                        // {
-
-                                        clsGraphData graphBarData = new clsGraphData();
-                                        graphBarData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
-                                        graphBarData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
-                                        //Cummulative Rain...
-                                        graphBarData.ParameterValue = finalHR; //dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
-                                        graphBarData.ParameterUnit = "mm";
-                                        LstgraphBarCummData.Add(graphBarData);
-                                        stationGraphCummRain.GraphBarData = LstgraphBarCummData;
-
-                                        // }
+                                        finalHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
                                     }
+
+                                    //strCumRainFinal[s] = dsSTData.Tables[0].Rows[s]["Date"].ToString() + " , "  + dsSTData.Tables[0].Rows[s]["Time"].ToString() + " , " +  finalHR + " , " + dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
+
+                                    clsGraphData graphData = new clsGraphData();
+                                    graphData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
+                                    graphData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
+                                    graphData.ParameterValue = dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString(); //finalHR;
+                                    graphData.ParameterUnit = "mm";
+                                    LstgraphCummData.Add(graphData);
+                                    stationGraphCummRain.GraphData = LstgraphCummData;
+
+                                    // if (dsSTData.Tables[0].Rows[s]["Date"].ToString() == CurrDate && Convert.ToDateTime(dsSTData.Tables[0].Rows[s]["Time"]) >= time)
+                                    // {
+
+                                    clsGraphData graphBarData = new clsGraphData();
+                                    graphBarData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
+                                    graphBarData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
+                                    //Cummulative Rain...
+                                    graphBarData.ParameterValue = finalHR; //dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
+                                    graphBarData.ParameterUnit = "mm";
+                                    LstgraphBarCummData.Add(graphBarData);
+                                    stationGraphCummRain.GraphBarData = LstgraphBarCummData;
+
+                                    // }
                                 }
+
 
                                 /*
                                 for (int s = 0; s < dsSTData.Tables[0].Rows.Count; s++)
@@ -1238,7 +1366,7 @@ namespace AWSAPI
                                                 List<clsGraphData> LstgraphBarData = new List<clsGraphData>();
                                                 List<clsGraphData> LstgraphBarDataWG = new List<clsGraphData>();
 
-                                                for (int r = 0; r < reportDT.Rows.Count - 4; r++)
+                                                for (int r = 0; r < reportDT.Rows.Count; r++)
                                                 {
                                                     clsGraphData graphBarData = new clsGraphData();
                                                     graphBarData.Date = reportDT.Rows[r]["Date"].ToString();
@@ -1305,7 +1433,9 @@ namespace AWSAPI
 
                                                 List<clsGraphData> LstgraphData = new List<clsGraphData>();
 
-                                                for (int r = 0; r < reportDT.Rows.Count - 4; r++)
+                                                //Change by Vikas ---> 15-Dec-2023
+                                                //for (int r = 0; r < reportDT.Rows.Count - 4; r++)
+                                                for (int r = 0; r < reportDT.Rows.Count; r++)
                                                 {
                                                     clsGraphData graphData = new clsGraphData();
                                                     graphData.Date = reportDT.Rows[r]["Date"].ToString();
@@ -1550,7 +1680,7 @@ namespace AWSAPI
                 {
                     rowCnt++;
                     DataRow dr = reportDT.Rows[i];
-                    if (rowCnt < 4)
+                    if (rowCnt < 2)
                         dr.Delete();
 
                 }
@@ -1688,12 +1818,16 @@ namespace AWSAPI
                 type = "rain";
             else if (ParaName.ToLower().Contains("daily"))
                 type = "rain";
+            else if (ParaName.ToLower().Contains("15mins"))
+                type = "rain";
             else if (ParaName.ToLower().Contains("tempera"))
                 type = "temperature";
             else if (ParaName.ToLower().Contains("snow"))
                 type = "snow";
             else if (ParaName.ToLower().Contains("evapora"))
                 type = "evaporation";
+            else if (ParaName.Contains("WIND DIRECTION AT MAX WIND SPEED"))
+                type = "highspeed";
             else if (ParaName.ToLower().Contains("wind spe") || ParaName.ToLower().Contains("windspe") || ParaName.ToLower().Contains("maxws"))
                 type = "windspeed";
             else if (ParaName.ToLower().Contains("wind dir") || ParaName.ToLower().Contains("winddir"))
@@ -1715,6 +1849,10 @@ namespace AWSAPI
                 type = "heat index";
             else if (ParaName.ToLower().Contains("thw index"))
                 type = "thw index";
+            else if (ParaName.ToLower().Contains("wind gust"))
+                type = "wind gust";
+            else if (ParaName.ToLower().Contains("rain rate"))
+                type = "rain rate";
 
             return type;
         }
@@ -1738,6 +1876,12 @@ namespace AWSAPI
                 for (int j = 0; j < 3; j++)
                 {
                     reportset = ObjDB.sp_getTotalBurst_Status("GetStationDataLast24", StID, fromDate, toDate, status, "Web");
+                    string prname = "select profile from [tbl_StationMaster] where StationID = '" + StID + "'";
+                    DataTable Pname = ObjDB.FetchDataTable(prname, "Web");
+                    if(Pname.Rows[0][0].ToString() == "VMC-AWS-GUJ")
+                    {
+                        reportset.Tables[0].Columns.Remove("Status");
+                    }
                     if (reportset.Tables.Count > 0)
                         break;
                     Thread.Sleep(1000);
@@ -1796,23 +1940,23 @@ namespace AWSAPI
                                 double degreeTemp = 0.0;
                                 //double FahrenheitTemp = 0.0;
 
-                                if (!dt2.Rows[j][6].ToString().Contains("--"))
+                                if (!dt2.Rows[j]["Air Temperature(C)"].ToString().Contains("--"))
                                 {
-                                    degreeTemp = Convert.ToDouble(dt2.Rows[j][6].ToString());
+                                    degreeTemp = Convert.ToDouble(dt2.Rows[j]["Air Temperature(C)"].ToString());
                                     //FahrenheitTemp = Convert.ToDouble(dt2.Rows[j][6].ToString()) * 1.8 + 32;
                                     //dt2.Rows[j][6] = FahrenheitTemp.ToString();
-                                    dt2.Rows[j][6] = degreeTemp.ToString("F2");
+                                    dt2.Rows[j]["Air Temperature(C)"] = degreeTemp.ToString("F2");
                                 }
                                 else
                                 {
-                                    dt2.Rows[j][6] = "--";
+                                    dt2.Rows[j]["Humidity(%)"] = "--";
                                 }
 
                                 strFunctionName = "VMC Station DataSet-6";
 
-                                if (dt2.Rows[j][6].ToString().Contains("--") == false && dt2.Rows[j][10].ToString().Contains("--") == false)
+                                if (dt2.Rows[j]["Humidity(%)"].ToString().Contains("--") == false && dt2.Rows[j]["Air Temperature(C)"].ToString().Contains("--") == false)
                                 {
-                                    double hum = Convert.ToDouble(dt2.Rows[j][10].ToString());
+                                    double hum = Convert.ToDouble(dt2.Rows[j]["Humidity(%)"].ToString());
 
                                     //dt2.Rows[j]["Dew Point"] = ObjDP.funCalDewPoint(FahrenheitTemp, hum).ToString("F2");
                                     double DegDewPoint = ObjDP.funCalDewPoint(degreeTemp, hum);
@@ -1831,9 +1975,9 @@ namespace AWSAPI
                                     dt2.Rows[j]["Heat Index"] = "--";
                                 }
                                 strFunctionName = "VMC Station DataSet-7";
-                                if (dt2.Rows[j][7].ToString().Contains("--") == false)
+                                if (dt2.Rows[j]["Wind Speed(m/s)"].ToString().Contains("--") == false)
                                 {
-                                    double ws = Convert.ToDouble(dt2.Rows[j][7].ToString());
+                                    double ws = Convert.ToDouble(dt2.Rows[j]["Wind Speed(m/s)"].ToString());
                                     dt2.Rows[j]["Wind Run"] = ObjDP.funCalWindRun(ws).ToString("F2");
                                 }
                                 else
@@ -1842,9 +1986,9 @@ namespace AWSAPI
                                 }
                                 strFunctionName = "VMC Station DataSet-8";
 
-                                if (dt2.Rows[j][7].ToString().Contains("--") == false && dt2.Rows[j][6].ToString().Contains("--") == false)
+                                if (dt2.Rows[j]["Wind Speed(m/s)"].ToString().Contains("--") == false && dt2.Rows[j]["Air Temperature(C)"].ToString().Contains("--") == false)
                                 {
-                                    double ws = Convert.ToDouble(dt2.Rows[j][7].ToString());
+                                    double ws = Convert.ToDouble(dt2.Rows[j]["Wind Speed(m/s)"].ToString());
 
                                     // dt2.Rows[j]["Wind Chill"] = ObjDP.funCalWindChill(ws, FahrenheitTemp).ToString("F2");
                                     double WCPoint = ObjDP.funCalWindChill(ws, degreeTemp);
@@ -1857,9 +2001,9 @@ namespace AWSAPI
                                 }
                                 strFunctionName = "VMC Station DataSet-9";
 
-                                if (dt2.Rows[j][7].ToString().Contains("--") == false && dt2.Rows[j][6].ToString().Contains("--") == false && dt2.Rows[j][10].ToString().Contains("--") == false)
+                                if (dt2.Rows[j][7].ToString().Contains("--") == false && dt2.Rows[j]["Humidity(%)"].ToString().Contains("--") == false && dt2.Rows[j]["Air Temperature(C)"].ToString().Contains("--") == false)
                                 {
-                                    double ws = Convert.ToDouble(dt2.Rows[j][7].ToString());
+                                    double ws = Convert.ToDouble(dt2.Rows[j]["Wind Speed(m/s)"].ToString());
                                     double hum = Convert.ToDouble(dt2.Rows[j][10].ToString());
 
                                     //dt2.Rows[j]["THW Index"] = ObjDP.funCalTHWIndex(FahrenheitTemp, hum, ws).ToString("F2");
@@ -2079,9 +2223,14 @@ namespace AWSAPI
                     var SensorIDsql = db.tbl_SensorMaster.Where(x => x.Name == sensorName).FirstOrDefault();
                     int sensorID = Convert.ToInt32(SensorIDsql.ID);
                     var getUnit = db.tbl_ParameterMaster.Where(x => x.SensorID == sensorID).FirstOrDefault();
+
                     if (getUnit == null)
                     {
-                        ReportcolumnName += columnDataTable.Rows[i][0].ToString() + ",";
+                        if(sensorName != "Status")
+                        {
+                            ReportcolumnName += columnDataTable.Rows[i][0].ToString() + ",";
+                        }
+                        
                     }
                     else
                     {
@@ -2317,8 +2466,12 @@ namespace AWSAPI
                                 dynamicDailyData.Add(dynamicDailyData6);
 
                                 clsDynamicDailyData dynamicDailyData7 = new clsDynamicDailyData();
-                                int pop = (int)objroot.daily[j].pop;
-                                dynamicDailyData7.dailyParaValue = pop.ToString();
+
+                                //CHANGE BY VIKAS --> 26-Jul-2024                                 
+                                //int pop = (int)objroot.daily[j].pop;
+                                //dynamicDailyData7.dailyParaValue = pop.ToString();
+                                decimal pop = (decimal)objroot.daily[j].pop;
+                                dynamicDailyData7.dailyParaValue = (pop * 100).ToString("F0"); //string.Format("{0:0.#}", (pop * 100).ToString());
                                 dynamicDailyData7.dailyParaUnit = "%";
                                 dynamicDailyData.Add(dynamicDailyData7);
 
@@ -2371,11 +2524,14 @@ namespace AWSAPI
                                 LstdynamicHourlyData.Add(dynamicHourlyData5);
 
                                 clsDynamicHourlyData dynamicHourlyData6 = new clsDynamicHourlyData();
-                                int pop = (int)objroot.hourly[j].pop;
-                                dynamicHourlyData6.hourlyParaValue = pop.ToString();
+
+                                //CHANGE BY VIKAS --> 26-Jul-2024
+                                //int pop = (int)objroot.hourly[j].pop;
+                                //dynamicHourlyData6.hourlyParaValue = pop.ToString();
+                                decimal pop = (decimal)objroot.hourly[j].pop;
+                                dynamicHourlyData6.hourlyParaValue = (pop * 100).ToString("F0"); //string.Format("{0:0.#}",(pop * 100).ToString());
                                 dynamicHourlyData6.hourlyParaUnit = "%";
                                 LstdynamicHourlyData.Add(dynamicHourlyData6);
-
                                 hourlyValues.dynamicHourlyData = LstdynamicHourlyData;
                                 LsthourlyValues.Add(hourlyValues);
 
@@ -2634,8 +2790,8 @@ namespace AWSAPI
 
                     string fromDate = "";
                     string toDate = "";
-
-                    if (!string.IsNullOrEmpty(day))
+                    
+                    if (!string.IsNullOrEmpty(day) && !string.IsNullOrEmpty(month) && !string.IsNullOrEmpty(year))
                     {
                         int monthNumber = DateTime.ParseExact(month, "MMM", CultureInfo.CurrentCulture).Month;
 
@@ -2651,7 +2807,7 @@ namespace AWSAPI
 
                         }
                     }
-                    else if (string.IsNullOrEmpty(day) && !string.IsNullOrEmpty(month))
+                    else if (string.IsNullOrEmpty(day) && !string.IsNullOrEmpty(month) && !string.IsNullOrEmpty(year))
                     {
                         int monthNumber = DateTime.ParseExact(month, "MMM", CultureInfo.CurrentCulture).Month;
                         int yr = Convert.ToInt32(year);
@@ -2673,44 +2829,6 @@ namespace AWSAPI
                     //If VMC then [Battery Voltage],[Hourly Rainfall],[Daily Rain],[Air Temperature],[Wind Speed],[Wind Direction],[Atmospheric Pressure],[Humidity]
                     //If Not VMC then [Battery Voltage],[Hourly Rainfall],[Daily Rain],[Air Temperature],[Wind Speed],[Wind Direction],[Atmospheric Pressure],[Humidity],[Peripheral Status]
                     //For Forest GOA ---> 
-
-                    DataSet dsMin = null;
-
-                    for (int j = 0; j < 3; j++)
-                    {
-                        dsMin = ObjDB.sp_MinMaxStationData_Status("rpt_DataReport_MinMaxUnit_NewVMCHistory", StID, fromDate, toDate, "MinVal", "", "Web");
-                        if (dsMin.Tables.Count > 0)
-                            break;
-                        Thread.Sleep(1000);
-                    }
-
-
-                    DataSet dsMax = null;
-
-                    for (int j = 0; j < 3; j++)
-                    {
-                        dsMax = ObjDB.sp_MinMaxStationData_Status("rpt_DataReport_MinMaxUnit_NewVMCHistory", StID, fromDate, toDate, "MaxVal", "", "Web");
-                        if (dsMax.Tables.Count > 0)
-                            break;
-                        Thread.Sleep(1000);
-                    }
-
-                    //Put condition over here ....
-                    //Max WindSpeed Value,DateMax,TimeMax && Correspnding WindDirection Value....
-
-                    string DateHighWS = dsMax.Tables[0].Rows[4][0].ToString();
-                    string TimeHighWS = dsMax.Tables[0].Rows[4][1].ToString();
-                    string HighWS = dsMax.Tables[0].Rows[4][2].ToString();
-
-                    string DominantWD = dsMax.Tables[0].Rows[5][2].ToString();
-
-                    double WindDirDegree = Convert.ToDouble(DominantWD);
-                    string[] Sector = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N" };
-                    string DominantWindDir = Sector[Convert.ToInt32(Math.Round((WindDirDegree % 360) / 22.5))];
-
-                    string WindGust = "";
-                    WindGust = HighWS; // + " mps / " + DominantWindDir;
-
                     string SelQry = @"select  pm.Name,pm.SensorName,srm.unit,srm.ValidationString,sm.ShowInGraph,sm.ShowInGrid from [tbl_StationMaster ] sm join tbl_StationRangeValidation srm on
                         sm.Profile=srm.ProfileName join tbl_ProfileMaster pm on sm.Profile = pm.Name where sm.StationID='" + StID + "'";
 
@@ -2724,98 +2842,395 @@ namespace AWSAPI
                     }
 
                     string ProfileNM = dtUnit.Tables[0].Rows[0]["Name"].ToString();
-
-                    string DateHighRain = null, TimeHighRain = null, HighRain= null;
-                    string RainTotal = "";
-
-                    if (ProfileNM == "VMC-NHP-GUJ")
+                    if(ProfileNM == "VMC-AWS-GUJ")
                     {
-                        #region For calculate VMC-RainTotal....Modify by vikas --> 2022-07-14
+                        DataSet dsMin = null;
 
-                        DataRow dr1 = dsMax.Tables[0].NewRow();
-                        dr1[0] = DateHighWS;
-                        dr1[1] = TimeHighWS;
-                        dr1[2] = WindGust;
-                        dsMax.Tables[0].Rows.Add(dr1);
-
-
-                        toDate = Convert.ToDateTime(toDate).AddDays(1).ToString("yyyy-MM-dd");
-                        string SelRainQry = @"SELECT [StationID], SUM([MAXHOUR]) as CummulativeRain FROM (SELECT [StationID], DATEADD(second,DATEDIFF(second,'1970-01-01',CAST([Date] AS datetime) + CAST(DATEADD(minute,-15,CAST([Time] AS datetime)) AS datetime))/3600*3600 , '1970-01-01') AS [DATEHOUR]
-                    , MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS [MAXHOUR] FROM tbl_StationData_" + StID.Trim() + " with(nolock) where CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + fromDate.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) < '" + toDate.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
-
-                        DataSet dsRain = null;
-                        for (int r = 0; r < 3; r++)
+                        for (int j = 0; j < 3; j++)
                         {
-                            dsRain = ObjDB.FetchDataset(SelRainQry, "Web");
-                            if (dsRain.Tables.Count > 0)
+                            dsMin = ObjDB.sp_MinMaxStationData_Status("rpt_DemoDataReport_MinMaxUnit_NewVMCHistory", StID, fromDate, toDate, "MinVal", "", "Web");
+                            
+                            if (dsMin.Tables.Count > 0)
                                 break;
                             Thread.Sleep(1000);
                         }
 
-                       
 
-                        if (dsRain.Tables.Count > 0)
+                        DataSet dsMax = null;
+
+                        for (int j = 0; j < 3; j++)
                         {
-                            if (dsRain.Tables[0].Rows.Count > 0)
+                            dsMax = ObjDB.sp_MinMaxStationData_Status("rpt_DemoDataReport_MinMaxUnit_NewVMCHistory", StID, fromDate, toDate, "MaxVal", "", "Web");
+                            
+                            if (dsMax.Tables.Count > 0)
+                                break;
+                            Thread.Sleep(1000);
+                        }
+
+                        //Put condition over here ....
+                        //Max WindSpeed Value,DateMax,TimeMax && Correspnding WindDirection Value....
+                        DataRow windSpeedRow = dsMax.Tables[0].AsEnumerable()
+                                               .FirstOrDefault(row => row.Field<string>("ColumnName") == "[Wind Speed]");
+                        DataRow windDirectionRow = dsMax.Tables[0].AsEnumerable()
+                                               .FirstOrDefault(row => row.Field<string>("ColumnName") == "[Wind Direction]");
+                        DataRow windgustRow = dsMax.Tables[0].AsEnumerable()
+                                               .FirstOrDefault(row => row.Field<string>("ColumnName") == "[WIND GUST]");
+                        DataRow RainRow = dsMax.Tables[0].AsEnumerable()
+                                               .FirstOrDefault(row => row.Field<string>("ColumnName") == "[15mins RAINFALL]");
+
+                        string DateHighWS = windSpeedRow.Field<string>("Date");
+                        string TimeHighWS = windSpeedRow.Field<string>("Time");
+                        string HighWS = windSpeedRow.Field<string>("maxVal");
+
+                        // Now you have DateHighWS, TimeHighWS, and HighWS for the "Wind Speed" column
+                        // Use these variables as needed.
+
+
+                        //string DominantWD = dsMax.Tables[0].Rows[5][2].ToString();
+                        string DominantWD = windDirectionRow.Field<string>("maxVal");
+                        double WindDirDegree = Convert.ToDouble(DominantWD);
+                        string[] Sector = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N" };
+                        string DominantWindDir = Sector[Convert.ToInt32(Math.Round((WindDirDegree % 360) / 22.5))];
+
+                        string WindGust = "";
+                        WindGust = windgustRow.Field<string>("maxVal"); // + " mps / " + DominantWindDir;
+
+
+
+                        string DateHighRain = null, TimeHighRain = null, HighRain = null;
+                        string RainTotal = "";
+
+                        if (ProfileNM == "VMC-AWS-GUJ")
+                        {
+                            #region For calculate VMC-RainTotal....Modify by vikas --> 2022-07-14
+
+                            /*DataRow dr1 = dsMax.Tables[0].NewRow();
+                            dr1[0] = DateHighWS;
+                            dr1[1] = TimeHighWS;
+                            dr1[2] = WindGust;
+                            dsMax.Tables[0].Rows.Add(dr1);*/
+
+
+                            toDate = Convert.ToDateTime(toDate).AddDays(1).ToString("yyyy-MM-dd");
+                            //string SelRainQry = @"SELECT [StationID], SUM([MAXHOUR]) as CummulativeRain FROM (SELECT [StationID], DATEADD(second,DATEDIFF(second,'1970-01-01',CAST([Date] AS datetime) + CAST(DATEADD(minute,-15,CAST([Time] AS datetime)) AS datetime))/3600*3600 , '1970-01-01') AS [DATEHOUR]
+                            //                           , MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS [MAXHOUR] FROM tbl_StationData_" + StID.Trim() + " with(nolock) where CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + fromDate.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) < '" + toDate.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
+                            string SelRainQry = "select  [StationID],sum(try_cast(RTRIM(LTRIM(replace([15mins RAINFALL], ''' + + ''', ''''))) as decimal(18,2))) as CummulativeRain from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + fromDate.Trim() + "' and  CAST([Date] AS datetime) +CAST([Time] AS datetime) < '" + toDate.Trim() + "' group by StationID";
+                            DataSet dsRain = null;
+                            for (int r = 0; r < 3; r++)
                             {
-                                for (int r = 0; r < dsRain.Tables[0].Rows.Count; r++)
+                                dsRain = ObjDB.FetchDataset(SelRainQry, "Web");
+                                if (dsRain.Tables.Count > 0)
+                                    break;
+                                Thread.Sleep(1000);
+                            }
+
+
+                            if (dsRain.Tables.Count > 0)
+                            {
+                                if (dsRain.Tables[0].Rows.Count > 0)
                                 {
-                                    RainTotal = dsRain.Tables[0].Rows[r]["CummulativeRain"].ToString();
+                                    for (int r = 0; r < dsRain.Tables[0].Rows.Count; r++)
+                                    {
+                                        RainTotal = dsRain.Tables[0].Rows[r]["CummulativeRain"].ToString();
+                                    }
                                 }
                             }
+
+                            DateHighRain = RainRow.Field<string>("Date"); ;
+                            TimeHighRain = RainRow.Field<string>("Time"); ;
+                            HighRain = RainRow.Field<string>("maxVal");
+
+                            #endregion For calculate VMC-RainTotal....Modify by vikas --> 2022-07-14
                         }
 
-                        DateHighRain = dsMax.Tables[0].Rows[1][0].ToString();
-                        TimeHighRain = dsMax.Tables[0].Rows[1][1].ToString();
-                        HighRain = dsMax.Tables[0].Rows[1][2].ToString();
+                        string[] Parameters = dtUnit.Tables[0].Rows[0]["SensorName"].ToString().Split(',');
+                        string[] Units = dtUnit.Tables[0].Rows[0]["unit"].ToString().Split(',');
 
-                        #endregion For calculate VMC-RainTotal....Modify by vikas --> 2022-07-14
-                    }
+                        string strfinalUnits = string.Empty;
+                        List<string> finalUnits = null;
 
-                    string[] Parameters = dtUnit.Tables[0].Rows[0]["SensorName"].ToString().Split(',');
-                    string[] Units = dtUnit.Tables[0].Rows[0]["unit"].ToString().Split(',');
+                        string strfinalPara = string.Empty;
+                        List<string> finalPara = null;
 
-                    string strfinalUnits = string.Empty;
-                    List<string> finalUnits = null;
-
-                    string strfinalPara = string.Empty;
-                    List<string> finalPara = null;
-
-                    if (ProfileNM == "VMC-NHP-GUJ")
-                    {
-                        string EliminatePara = "Water Level,Snow Depth,Evaporation, Solar Radiation,Peripheral Status";
-                        for (int p = 4; p < Parameters.Length - 1; p++)
+                        if (ProfileNM == "VMC-AWS-GUJ")
                         {
-                            if (!EliminatePara.Contains(Parameters[p]))
+                            string EliminatePara = "Water Level,Snow Depth,Evaporation, Solar Radiation,Peripheral Status,WIND DIRECTION AT MAX WIND SPEED,RAIN RATE,15mins RAINFALL";
+                            for (int p = 4; p < Parameters.Length - 1; p++)
                             {
-                                strfinalUnits = strfinalUnits + "," + Units[p];
-                                strfinalPara = strfinalPara + "," + Parameters[p];
+                                if (!EliminatePara.Contains(Parameters[p]))
+                                {
+                                    if(Parameters[p] == "WIND GUST")
+                                    {
+                                        strfinalUnits = strfinalUnits + "," + Units[p] + " / " + DominantWindDir;
+                                    }
+                                    else
+                                    {
+                                        strfinalUnits = strfinalUnits + "," + Units[p];
+                                    }
+                                    
+                                    
+                                    
+                                    strfinalPara = strfinalPara + "," + Parameters[p];
+                                }
                             }
+
+                            
+                            //strfinalUnits = strfinalUnits + "," + "mps";
+                            strfinalUnits = strfinalUnits.Replace("Degree", "°").TrimStart(',');
+                            finalUnits = strfinalUnits.Replace("C", "°C").Split(',').ToList();
+
+                            //strfinalPara = strfinalPara + "," + "Wind Gust";
+                            strfinalPara = strfinalPara.TrimStart(',');
+                            finalPara = strfinalPara.Split(',').ToList();
+                        }
+                        else
+                        {
+                            string EliminatePara = "";
+
+
+                            if (ProfileNM.ToLower().Contains("nhp-"))
+                            {
+                                if (ProfileNM.ToLower().Contains("awlr"))
+                                    EliminatePara = "Snow Depth,Evaporation, Solar Radiation,Peripheral Status";
+                                else if (ProfileNM.ToLower().Contains("aws"))
+                                    EliminatePara = "Water Level,Snow Depth,Evaporation,Peripheral Status";
+                                else if (ProfileNM.ToLower().Contains("aws+awlr"))
+                                    EliminatePara = "Snow Depth,Evaporation, Solar Radiation,Peripheral Status";
+
+                                for (int p = 4; p < Parameters.Length - 1; p++)
+                                {
+                                    if (!EliminatePara.Contains(Parameters[p]))
+                                    {
+                                        strfinalUnits = strfinalUnits + "," + Units[p];
+                                        strfinalPara = strfinalPara + "," + Parameters[p];
+                                    }
+                                }
+
+                            }
+                            else
+                            {
+                                //StationID,Station Name,Latitude,Longitude,Altitude,Date,Time,Battery Voltage,GPS,GPRS SIGNALSTRENGTH,TypeOfSystem,NoOfParameters,RainFall HealthStatus,Hourly Rainfall,Daily Rain,Air Temperature HealthStatus,Air Temperature,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity HealthStatus,Humidity,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection HealthStatus10m,WindDirection 10m,WindSpeed HealthStatus10m,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,MaxWindSpeed 10m,WindSpeed DayMax10m,Pressure HealthStatus,Atmospheric Pressure,WindDirection HealthStatus3m,WindDirection 3m,WindSpeed HealthStatus3m,WindSpeed 3m1minAvg,WindSpeed 3m3minAvg,WindSpeed 3m10minAvg,MaxWindSpeed 3m,WindSpeed DayMax3m,SoilTemperature HealthStatus10cm,SoilTemperature 10cm,SoilMoisture HealthStatus10cm,SoilMoisture 10cm,SoilTemperature HealthStatus30cm,SoilTemperature 30cm,SoilMoisture HealthStatus30cm,SoilMoisture 30cm,SoilTemperature HealthStatus70cm,SoilTemperature 70cm,SoilMoisture HealthStatus70cm,SoilMoisture 70cm,SoilTemperature HealthStatus100cm,SoilTemperature 100cm,SoilMoisture HealthStatus100cm,SoilMoisture 100cm,SolarRadiation HealthStatus,Sunshine Duration,Global Radiation,Radiation HealthStatus,Par Data,Evaporameter HealthStatus,Evaporameter,UVRadiation_a HealthStatus,UV Radiation_a,UVRadiation_b HealthStatus,UV Radiation_b,UV Index,VisibilitySensor HealthStatus,Visibility,SnowDepth HealthStatus,Snow Depth,SnowWater HealthStatus,Snow WaterEquivalent,WaterLevel HealthStatus,WaterLevel Measurement
+                                //EliminatePara = "StationID,Station Name,Latitude,Longitude,Altitude,Date,Time,Battery Voltage,GPS,GPRS SIGNALSTRENGTH,TypeOfSystem,NoOfParameters,RainFall HealthStatus,Hourly Rainfall,Daily Rain,AirTemperature HealthStatus,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity HealthStatus,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection HealthStatus10m,WindSpeed HealthStatus10m,Pressure HealthStatus,WindDirection HealthStatus3m,WindDirection 3m,WindSpeed HealthStatus3m,WindSpeed 3m1minAvg,WindSpeed 3m3minAvg,WindSpeed 3m10minAvg,MaxWindSpeed 3m,WindSpeed DayMax3m,SoilTemperature HealthStatus10cm,SoilMoisture HealthStatus10cm,SoilTemperature HealthStatus30cm,SoilTemperature 30cm,SoilMoisture HealthStatus30cm,SoilMoisture 30cm,SoilTemperature HealthStatus70cm,SoilMoisture HealthStatus70cm,SoilTemperature HealthStatus100cm,SoilTemperature 100cm,SoilMoisture HealthStatus100cm,SoilMoisture 100cm,SolarRadiation HealthStatus,Sunshine Duration,Global Radiation,Radiation HealthStatus,Par Data,Evaporameter HealthStatus,Evaporameter,UVRadiation_a HealthStatus,UV Radiation_a,UVRadiation_b HealthStatus,UV Radiation_b,UV Index,VisibilitySensor HealthStatus,Visibility,SnowDepth HealthStatus,Snow Depth,SnowWater HealthStatus,Snow WaterEquivalent,WaterLevel HealthStatus,WaterLevel Measurement";
+
+                                EliminatePara = "Battery Voltage,Hourly Rainfall,Daily Rain,Air Temperature,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection 10m,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,MaxWindSpeed 10m,WindSpeed DayMax10m,Atmospheric Pressure,SoilTemperature 10cm,SoilMoisture 10cm,SoilTemperature 70cm,SoilMoisture 70cm";
+
+                                //EliminatePara = "Battery Voltage,Hourly Rainfall,Daily Rain,Air Temperature,Humidity,WindDirection 10m,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,Atmospheric Pressure,SoilTemperature 10cm,SoilMoisture 10cm,SoilTemperature 70cm,SoilMoisture 70cm";
+
+                                string[] arrElimatePara = EliminatePara.Split(',');
+
+                                for (int p = 0; p < Parameters.Length - 1; p++)
+                                {
+                                    for (int e = 0; e < arrElimatePara.Length; e++)
+                                    {
+                                        if (Parameters[p].ToLower().Trim().Equals(arrElimatePara[e].ToLower().Trim()) == true)
+                                        {
+                                            strfinalUnits = strfinalUnits + "," + Units[p];
+                                            strfinalPara = strfinalPara + "," + Parameters[p];
+                                            break;
+                                        }
+                                    }
+
+                                }
+
+                            }
+
+                            strfinalUnits = strfinalUnits.TrimStart(',');
+                            finalUnits = strfinalUnits.Split(',').ToList();
+
+                            strfinalPara = strfinalPara.TrimStart(',');
+                            finalPara = strfinalPara.Split(',').ToList();
+
                         }
 
-                        strfinalUnits = strfinalUnits + "," + " m/s / " + DominantWindDir;
-                        //strfinalUnits = strfinalUnits + "," + "mps";
-                        strfinalUnits = strfinalUnits.Replace("Degree", "°").TrimStart(',');
-                        finalUnits = strfinalUnits.Replace("C", "°C").Split(',').ToList();
+                        dtFinal.Columns.Add("Parameter", typeof(string));
+                        dtFinal.Columns.Add("DateMin", typeof(string));
+                        dtFinal.Columns.Add("TimeMin", typeof(string));
+                        dtFinal.Columns.Add("MinVal", typeof(string));
+                        dtFinal.Columns.Add("DateMax", typeof(string));
+                        dtFinal.Columns.Add("TimeMax", typeof(string));
+                        dtFinal.Columns.Add("MaxVal", typeof(string));
+                        dtFinal.Columns.Add("Unit", typeof(string));
+                        var rowToRemovemin = dsMin.Tables[0].AsEnumerable()
+                                 .FirstOrDefault(row => row.Field<string>("ColumnName") == "[15mins RAINFALL]");
+                        dsMin.Tables[0].Rows.Remove(rowToRemovemin);
 
-                        strfinalPara = strfinalPara + "," + "Wind Gust";
-                        strfinalPara = strfinalPara.TrimStart(',');
-                        finalPara = strfinalPara.Split(',').ToList();
-                    }
-                    else
-                    {
-                        string EliminatePara = "";
-
-
-                        if (ProfileNM.ToLower().Contains("nhp-"))
+                        var rowToRemove = dsMax.Tables[0].AsEnumerable()
+                                 .FirstOrDefault(row => row.Field<string>("ColumnName") == "[15mins RAINFALL]");
+                        dsMax.Tables[0].Rows.Remove(rowToRemove);
+                        foreach (DataRow maxRow in dsMax.Tables[0].Rows)
                         {
-                            if (ProfileNM.ToLower().Contains("awlr"))
-                                EliminatePara = "Snow Depth,Evaporation, Solar Radiation,Peripheral Status";
-                            else if (ProfileNM.ToLower().Contains("aws"))
-                                EliminatePara = "Water Level,Snow Depth,Evaporation,Peripheral Status";
-                            else if (ProfileNM.ToLower().Contains("aws+awlr"))
-                                EliminatePara = "Snow Depth,Evaporation, Solar Radiation,Peripheral Status";
 
+                            string parameter = maxRow[2].ToString(); // Assuming the parameter is in the first column of dsMax.Tables[0]
+                            
+                                DataRow dr = dtFinal.NewRow();
+                                dtFinal.Rows.Add(dr);
+
+                                int m = dtFinal.Rows.Count - 1; // Index of the newly added row
+
+                                if (ProfileNM == "VMC-AWS-GUJ")
+                                {
+                                
+                                    dtFinal.Rows[m][0] = parameter.Replace("[", "").Replace("]", "");
+                                    if(dtFinal.Rows[m][0].ToString() == "WIND GUST")
+                                    {
+                                        dtFinal.Rows[m][0] = "Wind Gust";
+                                    }
+
+                                    if (m < 11)
+                                    {
+                                        DataRow minRows = dsMin.Tables[0].AsEnumerable()
+                                               .FirstOrDefault(row => row.Field<string>("ColumnName") == ""+ parameter +""); ;
+                                        if (minRows != null)
+                                        {
+                                            dtFinal.Rows[m][1] = minRows[0].ToString();
+                                            dtFinal.Rows[m][2] = minRows[1].ToString();
+                                            dtFinal.Rows[m][3] = minRows[3].ToString();
+                                        }
+                                    }
+
+                                    dtFinal.Rows[m][4] = maxRow[0].ToString();
+                                    dtFinal.Rows[m][5] = maxRow[1].ToString();
+                                    dtFinal.Rows[m][6] = maxRow[3].ToString();
+                                    // Assuming finalUnits has the same order as finalPara
+                                    dtFinal.Rows[m][7] = finalUnits[finalPara.IndexOf(parameter.Trim().Replace("[","").Replace("]", ""))];
+                                }
+                            
+                        }
+                        
+
+
+
+                        if (ProfileNM == "VMC-AWS-GUJ")
+                        {
+                            //Rain Customized parameter.....
+                            DataRow dr3 = dtFinal.NewRow();
+                            dr3[0] = "Rain";
+                            dr3[3] = RainTotal;
+                            dr3[4] = DateHighRain;
+                            dr3[5] = TimeHighRain;
+                            dr3[6] = HighRain;
+                            dr3[7] = "mm";
+                            dtFinal.Rows.Add(dr3);
+                        }
+                        else if (ProfileNM == "Forest-GOA-AWS")
+                        {
+                            #region Remove Dynamic Column from Forest-GOA-AWS...
+                            string[] arrRowsRemove = new string[] { "Temperature Minimum", "Temperature Maximum", "Temperature DayMinMax", "Humidity Minimum", "Humidity Maximum", "Humidity DayMinMax", "MaxWindSpeed 10m", "WindSpeed DayMax10m" };
+
+                            for (int a = 0; a < arrRowsRemove.Length; a++)
+                            {
+
+
+                                //var table = dtFinal.AsEnumerable().Where(r => r.Field<string>("Parameter") == "Temperature Minimum" || r.Field<string>("Parameter") == "Temperature Maximum" || r.Field<string>("Parameter") == "Temperature DayMinMax").ToList();
+                                var table = dtFinal.AsEnumerable().Where(r => r.Field<string>("Parameter") == arrRowsRemove[a]).ToList();
+                                foreach (var row in table)
+                                    dtFinal.Rows.Remove(row);
+
+
+                            }
+                            #endregion Remove Dynamic COlumn from Forest-GOA-AWS...
+                        }
+                    }
+                    
+                    else if(ProfileNM == "VMC-NHP-GUJ")
+                    {
+                        DataSet dsMin = null;
+
+                        for (int j = 0; j < 3; j++)
+                        {
+                            dsMin = ObjDB.sp_MinMaxStationData_Status("rpt_DataReport_MinMaxUnit_NewVMCHistory", StID, fromDate, toDate, "MinVal", "", "Web");
+                            if (dsMin.Tables.Count > 0)
+                                break;
+                            Thread.Sleep(1000);
+                        }
+
+
+                        DataSet dsMax = null;
+
+                        for (int j = 0; j < 3; j++)
+                        {
+                            dsMax = ObjDB.sp_MinMaxStationData_Status("rpt_DataReport_MinMaxUnit_NewVMCHistory", StID, fromDate, toDate, "MaxVal", "", "Web");
+                            if (dsMax.Tables.Count > 0)
+                                break;
+                            Thread.Sleep(1000);
+                        }
+
+                        //Put condition over here ....
+                        //Max WindSpeed Value,DateMax,TimeMax && Correspnding WindDirection Value....
+
+                        string DateHighWS = dsMax.Tables[0].Rows[4][0].ToString();
+                        string TimeHighWS = dsMax.Tables[0].Rows[4][1].ToString();
+                        string HighWS = dsMax.Tables[0].Rows[4][2].ToString();
+
+                        string DominantWD = dsMax.Tables[0].Rows[5][2].ToString();
+
+                        double WindDirDegree = Convert.ToDouble(DominantWD);
+                        string[] Sector = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N" };
+                        string DominantWindDir = Sector[Convert.ToInt32(Math.Round((WindDirDegree % 360) / 22.5))];
+
+                        string WindGust = "";
+                        WindGust = HighWS; // + " mps / " + DominantWindDir;
+
+                  
+                        string DateHighRain = null, TimeHighRain = null, HighRain = null;
+                        string RainTotal = "";
+
+                        if (ProfileNM == "VMC-NHP-GUJ")
+                        {
+                            #region For calculate VMC-RainTotal....Modify by vikas --> 2022-07-14
+
+                            DataRow dr1 = dsMax.Tables[0].NewRow();
+                            dr1[0] = DateHighWS;
+                            dr1[1] = TimeHighWS;
+                            dr1[2] = WindGust;
+                            dsMax.Tables[0].Rows.Add(dr1);
+
+
+                            toDate = Convert.ToDateTime(toDate).AddDays(1).ToString("yyyy-MM-dd");
+                            string SelRainQry = @"SELECT [StationID], SUM([MAXHOUR]) as CummulativeRain FROM (SELECT [StationID], DATEADD(second,DATEDIFF(second,'1970-01-01',CAST([Date] AS datetime) + CAST(DATEADD(minute,-15,CAST([Time] AS datetime)) AS datetime))/3600*3600 , '1970-01-01') AS [DATEHOUR]
+                    , MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS [MAXHOUR] FROM tbl_StationData_" + StID.Trim() + " with(nolock) where CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + fromDate.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) < '" + toDate.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
+
+                            DataSet dsRain = null;
+                            for (int r = 0; r < 3; r++)
+                            {
+                                dsRain = ObjDB.FetchDataset(SelRainQry, "Web");
+                                if (dsRain.Tables.Count > 0)
+                                    break;
+                                Thread.Sleep(1000);
+                            }
+
+
+
+                            if (dsRain.Tables.Count > 0)
+                            {
+                                if (dsRain.Tables[0].Rows.Count > 0)
+                                {
+                                    for (int r = 0; r < dsRain.Tables[0].Rows.Count; r++)
+                                    {
+                                        RainTotal = dsRain.Tables[0].Rows[r]["CummulativeRain"].ToString();
+                                    }
+                                }
+                            }
+
+                            DateHighRain = dsMax.Tables[0].Rows[1][0].ToString();
+                            TimeHighRain = dsMax.Tables[0].Rows[1][1].ToString();
+                            HighRain = dsMax.Tables[0].Rows[1][2].ToString();
+
+                            #endregion For calculate VMC-RainTotal....Modify by vikas --> 2022-07-14
+                        }
+
+                        string[] Parameters = dtUnit.Tables[0].Rows[0]["SensorName"].ToString().Split(',');
+                        string[] Units = dtUnit.Tables[0].Rows[0]["unit"].ToString().Split(',');
+
+                        string strfinalUnits = string.Empty;
+                        List<string> finalUnits = null;
+
+                        string strfinalPara = string.Empty;
+                        List<string> finalPara = null;
+
+                        if (ProfileNM == "VMC-NHP-GUJ")
+                        {
+                            string EliminatePara = "Water Level,Snow Depth,Evaporation, Solar Radiation,Peripheral Status";
                             for (int p = 4; p < Parameters.Length - 1; p++)
                             {
                                 if (!EliminatePara.Contains(Parameters[p]))
@@ -2825,134 +3240,184 @@ namespace AWSAPI
                                 }
                             }
 
+                            strfinalUnits = strfinalUnits + "," + " m/s / " + DominantWindDir;
+                            //strfinalUnits = strfinalUnits + "," + "mps";
+                            strfinalUnits = strfinalUnits.Replace("Degree", "°").TrimStart(',');
+                            finalUnits = strfinalUnits.Replace("C", "°C").Split(',').ToList();
+
+                            strfinalPara = strfinalPara + "," + "Wind Gust";
+                            strfinalPara = strfinalPara.TrimStart(',');
+                            finalPara = strfinalPara.Split(',').ToList();
                         }
                         else
                         {
-                            //StationID,Station Name,Latitude,Longitude,Altitude,Date,Time,Battery Voltage,GPS,GPRS SIGNALSTRENGTH,TypeOfSystem,NoOfParameters,RainFall HealthStatus,Hourly Rainfall,Daily Rain,Air Temperature HealthStatus,Air Temperature,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity HealthStatus,Humidity,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection HealthStatus10m,WindDirection 10m,WindSpeed HealthStatus10m,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,MaxWindSpeed 10m,WindSpeed DayMax10m,Pressure HealthStatus,Atmospheric Pressure,WindDirection HealthStatus3m,WindDirection 3m,WindSpeed HealthStatus3m,WindSpeed 3m1minAvg,WindSpeed 3m3minAvg,WindSpeed 3m10minAvg,MaxWindSpeed 3m,WindSpeed DayMax3m,SoilTemperature HealthStatus10cm,SoilTemperature 10cm,SoilMoisture HealthStatus10cm,SoilMoisture 10cm,SoilTemperature HealthStatus30cm,SoilTemperature 30cm,SoilMoisture HealthStatus30cm,SoilMoisture 30cm,SoilTemperature HealthStatus70cm,SoilTemperature 70cm,SoilMoisture HealthStatus70cm,SoilMoisture 70cm,SoilTemperature HealthStatus100cm,SoilTemperature 100cm,SoilMoisture HealthStatus100cm,SoilMoisture 100cm,SolarRadiation HealthStatus,Sunshine Duration,Global Radiation,Radiation HealthStatus,Par Data,Evaporameter HealthStatus,Evaporameter,UVRadiation_a HealthStatus,UV Radiation_a,UVRadiation_b HealthStatus,UV Radiation_b,UV Index,VisibilitySensor HealthStatus,Visibility,SnowDepth HealthStatus,Snow Depth,SnowWater HealthStatus,Snow WaterEquivalent,WaterLevel HealthStatus,WaterLevel Measurement
-                            //EliminatePara = "StationID,Station Name,Latitude,Longitude,Altitude,Date,Time,Battery Voltage,GPS,GPRS SIGNALSTRENGTH,TypeOfSystem,NoOfParameters,RainFall HealthStatus,Hourly Rainfall,Daily Rain,AirTemperature HealthStatus,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity HealthStatus,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection HealthStatus10m,WindSpeed HealthStatus10m,Pressure HealthStatus,WindDirection HealthStatus3m,WindDirection 3m,WindSpeed HealthStatus3m,WindSpeed 3m1minAvg,WindSpeed 3m3minAvg,WindSpeed 3m10minAvg,MaxWindSpeed 3m,WindSpeed DayMax3m,SoilTemperature HealthStatus10cm,SoilMoisture HealthStatus10cm,SoilTemperature HealthStatus30cm,SoilTemperature 30cm,SoilMoisture HealthStatus30cm,SoilMoisture 30cm,SoilTemperature HealthStatus70cm,SoilMoisture HealthStatus70cm,SoilTemperature HealthStatus100cm,SoilTemperature 100cm,SoilMoisture HealthStatus100cm,SoilMoisture 100cm,SolarRadiation HealthStatus,Sunshine Duration,Global Radiation,Radiation HealthStatus,Par Data,Evaporameter HealthStatus,Evaporameter,UVRadiation_a HealthStatus,UV Radiation_a,UVRadiation_b HealthStatus,UV Radiation_b,UV Index,VisibilitySensor HealthStatus,Visibility,SnowDepth HealthStatus,Snow Depth,SnowWater HealthStatus,Snow WaterEquivalent,WaterLevel HealthStatus,WaterLevel Measurement";
+                            string EliminatePara = "";
 
-                            EliminatePara = "Battery Voltage,Hourly Rainfall,Daily Rain,Air Temperature,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,MaxWindSpeed 10m,WindSpeed DayMax10m,Atmospheric Pressure,SoilTemperature 10cm,SoilMoisture 10cm,SoilTemperature 70cm,SoilMoisture 70cm";
 
-                            string[] arrElimatePara = EliminatePara.Split(',');
-
-                            for (int p = 0; p < Parameters.Length - 1; p++)
+                            if (ProfileNM.ToLower().Contains("nhp-"))
                             {
-                                for (int e = 0; e < arrElimatePara.Length - 1; e++)
+                                if (ProfileNM.ToLower().Contains("awlr"))
+                                    EliminatePara = "Snow Depth,Evaporation, Solar Radiation,Peripheral Status";
+                                else if (ProfileNM.ToLower().Contains("aws"))
+                                    EliminatePara = "Water Level,Snow Depth,Evaporation,Peripheral Status";
+                                else if (ProfileNM.ToLower().Contains("aws+awlr"))
+                                    EliminatePara = "Snow Depth,Evaporation, Solar Radiation,Peripheral Status";
+
+                                for (int p = 4; p < Parameters.Length - 1; p++)
                                 {
-                                    if (Parameters[p].ToLower().Trim().Equals(arrElimatePara[e].ToLower().Trim()) == true)
+                                    if (!EliminatePara.Contains(Parameters[p]))
                                     {
                                         strfinalUnits = strfinalUnits + "," + Units[p];
                                         strfinalPara = strfinalPara + "," + Parameters[p];
-                                        break;
                                     }
                                 }
 
                             }
+                            else
+                            {
+                                //StationID,Station Name,Latitude,Longitude,Altitude,Date,Time,Battery Voltage,GPS,GPRS SIGNALSTRENGTH,TypeOfSystem,NoOfParameters,RainFall HealthStatus,Hourly Rainfall,Daily Rain,Air Temperature HealthStatus,Air Temperature,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity HealthStatus,Humidity,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection HealthStatus10m,WindDirection 10m,WindSpeed HealthStatus10m,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,MaxWindSpeed 10m,WindSpeed DayMax10m,Pressure HealthStatus,Atmospheric Pressure,WindDirection HealthStatus3m,WindDirection 3m,WindSpeed HealthStatus3m,WindSpeed 3m1minAvg,WindSpeed 3m3minAvg,WindSpeed 3m10minAvg,MaxWindSpeed 3m,WindSpeed DayMax3m,SoilTemperature HealthStatus10cm,SoilTemperature 10cm,SoilMoisture HealthStatus10cm,SoilMoisture 10cm,SoilTemperature HealthStatus30cm,SoilTemperature 30cm,SoilMoisture HealthStatus30cm,SoilMoisture 30cm,SoilTemperature HealthStatus70cm,SoilTemperature 70cm,SoilMoisture HealthStatus70cm,SoilMoisture 70cm,SoilTemperature HealthStatus100cm,SoilTemperature 100cm,SoilMoisture HealthStatus100cm,SoilMoisture 100cm,SolarRadiation HealthStatus,Sunshine Duration,Global Radiation,Radiation HealthStatus,Par Data,Evaporameter HealthStatus,Evaporameter,UVRadiation_a HealthStatus,UV Radiation_a,UVRadiation_b HealthStatus,UV Radiation_b,UV Index,VisibilitySensor HealthStatus,Visibility,SnowDepth HealthStatus,Snow Depth,SnowWater HealthStatus,Snow WaterEquivalent,WaterLevel HealthStatus,WaterLevel Measurement
+                                //EliminatePara = "StationID,Station Name,Latitude,Longitude,Altitude,Date,Time,Battery Voltage,GPS,GPRS SIGNALSTRENGTH,TypeOfSystem,NoOfParameters,RainFall HealthStatus,Hourly Rainfall,Daily Rain,AirTemperature HealthStatus,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity HealthStatus,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection HealthStatus10m,WindSpeed HealthStatus10m,Pressure HealthStatus,WindDirection HealthStatus3m,WindDirection 3m,WindSpeed HealthStatus3m,WindSpeed 3m1minAvg,WindSpeed 3m3minAvg,WindSpeed 3m10minAvg,MaxWindSpeed 3m,WindSpeed DayMax3m,SoilTemperature HealthStatus10cm,SoilMoisture HealthStatus10cm,SoilTemperature HealthStatus30cm,SoilTemperature 30cm,SoilMoisture HealthStatus30cm,SoilMoisture 30cm,SoilTemperature HealthStatus70cm,SoilMoisture HealthStatus70cm,SoilTemperature HealthStatus100cm,SoilTemperature 100cm,SoilMoisture HealthStatus100cm,SoilMoisture 100cm,SolarRadiation HealthStatus,Sunshine Duration,Global Radiation,Radiation HealthStatus,Par Data,Evaporameter HealthStatus,Evaporameter,UVRadiation_a HealthStatus,UV Radiation_a,UVRadiation_b HealthStatus,UV Radiation_b,UV Index,VisibilitySensor HealthStatus,Visibility,SnowDepth HealthStatus,Snow Depth,SnowWater HealthStatus,Snow WaterEquivalent,WaterLevel HealthStatus,WaterLevel Measurement";
 
+                                EliminatePara = "Battery Voltage,Hourly Rainfall,Daily Rain,Air Temperature,Temperature Minimum,Temperature Maximum,Temperature DayMinMax,Humidity,Humidity Minimum,Humidity Maximum,Humidity DayMinMax,WindDirection 10m,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,MaxWindSpeed 10m,WindSpeed DayMax10m,Atmospheric Pressure,SoilTemperature 10cm,SoilMoisture 10cm,SoilTemperature 70cm,SoilMoisture 70cm";
+
+                                //EliminatePara = "Battery Voltage,Hourly Rainfall,Daily Rain,Air Temperature,Humidity,WindDirection 10m,WindSpeed 10m1minAvg,WindSpeed 10m3minAvg,WindSpeed 10m10minAvg,Atmospheric Pressure,SoilTemperature 10cm,SoilMoisture 10cm,SoilTemperature 70cm,SoilMoisture 70cm";
+
+                                string[] arrElimatePara = EliminatePara.Split(',');
+
+                                for (int p = 0; p < Parameters.Length - 1; p++)
+                                {
+                                    for (int e = 0; e < arrElimatePara.Length; e++)
+                                    {
+                                        if (Parameters[p].ToLower().Trim().Equals(arrElimatePara[e].ToLower().Trim()) == true)
+                                        {
+                                            strfinalUnits = strfinalUnits + "," + Units[p];
+                                            strfinalPara = strfinalPara + "," + Parameters[p];
+                                            break;
+                                        }
+                                    }
+
+                                }
+
+                            }
+
+                            strfinalUnits = strfinalUnits.TrimStart(',');
+                            finalUnits = strfinalUnits.Split(',').ToList();
+
+                            strfinalPara = strfinalPara.TrimStart(',');
+                            finalPara = strfinalPara.Split(',').ToList();
 
                         }
 
-
-                        strfinalUnits = strfinalUnits.TrimStart(',');
-                        finalUnits = strfinalUnits.Split(',').ToList();
-
-                        strfinalPara = strfinalPara.TrimStart(',');
-                        finalPara = strfinalPara.Split(',').ToList();
-
-                    }
-
-                    dtFinal.Columns.Add("Parameter", typeof(string));
-                    dtFinal.Columns.Add("DateMin", typeof(string));
-                    dtFinal.Columns.Add("TimeMin", typeof(string));
-                    dtFinal.Columns.Add("MinVal", typeof(string));
-                    dtFinal.Columns.Add("DateMax", typeof(string));
-                    dtFinal.Columns.Add("TimeMax", typeof(string));
-                    dtFinal.Columns.Add("MaxVal", typeof(string));
-                    dtFinal.Columns.Add("Unit", typeof(string));
+                        dtFinal.Columns.Add("Parameter", typeof(string));
+                        dtFinal.Columns.Add("DateMin", typeof(string));
+                        dtFinal.Columns.Add("TimeMin", typeof(string));
+                        dtFinal.Columns.Add("MinVal", typeof(string));
+                        dtFinal.Columns.Add("DateMax", typeof(string));
+                        dtFinal.Columns.Add("TimeMax", typeof(string));
+                        dtFinal.Columns.Add("MaxVal", typeof(string));
+                        dtFinal.Columns.Add("Unit", typeof(string));
 
 
-                    for (int m = 0; m < dsMax.Tables[0].Rows.Count; m++)
-                    {
-                        DataRow dr = dtFinal.NewRow();
-                        dtFinal.Rows.Add(dr);
+                        for (int m = 0; m < dsMax.Tables[0].Rows.Count; m++)
+                        {
+                            DataRow dr = dtFinal.NewRow();
+                            dtFinal.Rows.Add(dr);
+
+                            if (ProfileNM == "VMC-NHP-GUJ")
+                            {
+                                dtFinal.Rows[m][0] = finalPara[m];
+
+                                if (m < 8)
+                                {
+                                    dtFinal.Rows[m][1] = dsMin.Tables[0].Rows[m][0].ToString();
+                                    dtFinal.Rows[m][2] = dsMin.Tables[0].Rows[m][1].ToString();
+                                    dtFinal.Rows[m][3] = dsMin.Tables[0].Rows[m][2].ToString();
+                                }
+                                //else if(m == 8)
+                                //{
+                                //    dtFinal.Rows[m][3] = "";
+                                //}
+
+                                dtFinal.Rows[m][4] = dsMax.Tables[0].Rows[m][0].ToString();
+                                dtFinal.Rows[m][5] = dsMax.Tables[0].Rows[m][1].ToString();
+                                dtFinal.Rows[m][6] = dsMax.Tables[0].Rows[m][2].ToString();
+                                dtFinal.Rows[m][7] = finalUnits[m];
+                            }
+                            else if (ProfileNM == "Forest-GOA-AWS")
+                            {
+                                dtFinal.Rows[m][0] = finalPara[m];
+
+                                if (m < dsMax.Tables[0].Rows.Count)
+                                {
+                                    dtFinal.Rows[m][1] = dsMin.Tables[0].Rows[m][0].ToString();
+                                    dtFinal.Rows[m][2] = dsMin.Tables[0].Rows[m][1].ToString();
+                                    dtFinal.Rows[m][3] = dsMin.Tables[0].Rows[m][2].ToString();
+                                }
+                                dtFinal.Rows[m][4] = dsMax.Tables[0].Rows[m][0].ToString();
+                                dtFinal.Rows[m][5] = dsMax.Tables[0].Rows[m][1].ToString();
+                                dtFinal.Rows[m][6] = dsMax.Tables[0].Rows[m][2].ToString();
+
+
+                                dtFinal.Rows[m][7] = finalUnits[m];
+                            }
+                            else
+                            {
+
+                                if (m >= finalPara.Count)
+                                {
+                                    finalPara.Add("Wind Gust");
+                                    finalUnits.Add("m/s");
+                                }
+
+                                dtFinal.Rows[m][0] = finalPara[m];
+
+                                if (m < dsMax.Tables[0].Rows.Count - 1)
+                                {
+                                    dtFinal.Rows[m][1] = dsMin.Tables[0].Rows[m][0].ToString();
+                                    dtFinal.Rows[m][2] = dsMin.Tables[0].Rows[m][1].ToString();
+                                    dtFinal.Rows[m][3] = dsMin.Tables[0].Rows[m][2].ToString();
+                                }
+                                dtFinal.Rows[m][4] = dsMax.Tables[0].Rows[m][0].ToString();
+                                dtFinal.Rows[m][5] = dsMax.Tables[0].Rows[m][1].ToString();
+                                dtFinal.Rows[m][6] = dsMax.Tables[0].Rows[m][2].ToString();
+
+                                dtFinal.Rows[m][7] = finalUnits[m];
+                            }
+
+                        }
+
 
                         if (ProfileNM == "VMC-NHP-GUJ")
                         {
-                            dtFinal.Rows[m][0] = finalPara[m];
-
-                            if (m < 8)
-                            {
-                                dtFinal.Rows[m][1] = dsMin.Tables[0].Rows[m][0].ToString();
-                                dtFinal.Rows[m][2] = dsMin.Tables[0].Rows[m][1].ToString();
-                                dtFinal.Rows[m][3] = dsMin.Tables[0].Rows[m][2].ToString();
-                            }
-                            //else if(m == 8)
-                            //{
-                            //    dtFinal.Rows[m][3] = "";
-                            //}
-
-                            dtFinal.Rows[m][4] = dsMax.Tables[0].Rows[m][0].ToString();
-                            dtFinal.Rows[m][5] = dsMax.Tables[0].Rows[m][1].ToString();
-                            dtFinal.Rows[m][6] = dsMax.Tables[0].Rows[m][2].ToString();
-                            dtFinal.Rows[m][7] = finalUnits[m];
+                            //Rain Customized parameter.....
+                            DataRow dr3 = dtFinal.NewRow();
+                            dr3[0] = "Rain";
+                            dr3[3] = RainTotal;
+                            dr3[4] = DateHighRain;
+                            dr3[5] = TimeHighRain;
+                            dr3[6] = HighRain;
+                            dr3[7] = "mm";
+                            dtFinal.Rows.Add(dr3);
                         }
                         else if (ProfileNM == "Forest-GOA-AWS")
                         {
-                            dtFinal.Rows[m][0] = finalPara[m];
+                            #region Remove Dynamic Column from Forest-GOA-AWS...
+                            string[] arrRowsRemove = new string[] { "Temperature Minimum", "Temperature Maximum", "Temperature DayMinMax", "Humidity Minimum", "Humidity Maximum", "Humidity DayMinMax", "MaxWindSpeed 10m", "WindSpeed DayMax10m" };
 
-                            if (m < dsMax.Tables[0].Rows.Count - 1)
+                            for (int a = 0; a < arrRowsRemove.Length; a++)
                             {
-                                dtFinal.Rows[m][1] = dsMin.Tables[0].Rows[m][0].ToString();
-                                dtFinal.Rows[m][2] = dsMin.Tables[0].Rows[m][1].ToString();
-                                dtFinal.Rows[m][3] = dsMin.Tables[0].Rows[m][2].ToString();
+
+
+                                //var table = dtFinal.AsEnumerable().Where(r => r.Field<string>("Parameter") == "Temperature Minimum" || r.Field<string>("Parameter") == "Temperature Maximum" || r.Field<string>("Parameter") == "Temperature DayMinMax").ToList();
+                                var table = dtFinal.AsEnumerable().Where(r => r.Field<string>("Parameter") == arrRowsRemove[a]).ToList();
+                                foreach (var row in table)
+                                    dtFinal.Rows.Remove(row);
+
+
                             }
-                            dtFinal.Rows[m][4] = dsMax.Tables[0].Rows[m][0].ToString();
-                            dtFinal.Rows[m][5] = dsMax.Tables[0].Rows[m][1].ToString();
-                            dtFinal.Rows[m][6] = dsMax.Tables[0].Rows[m][2].ToString();
-
-
-                            dtFinal.Rows[m][7] = finalUnits[m];
+                            #endregion Remove Dynamic COlumn from Forest-GOA-AWS...
                         }
-                        else
-                        {
-
-                            if (m >= finalPara.Count)
-                            {
-                                finalPara.Add("Wind Gust");
-                                finalUnits.Add("m/s");
-                            }
-
-                            dtFinal.Rows[m][0] = finalPara[m]; 
-
-                            if (m < dsMax.Tables[0].Rows.Count - 1)
-                            {
-                                dtFinal.Rows[m][1] = dsMin.Tables[0].Rows[m][0].ToString();
-                                dtFinal.Rows[m][2] = dsMin.Tables[0].Rows[m][1].ToString();
-                                dtFinal.Rows[m][3] = dsMin.Tables[0].Rows[m][2].ToString();
-                            }
-                            dtFinal.Rows[m][4] = dsMax.Tables[0].Rows[m][0].ToString();
-                            dtFinal.Rows[m][5] = dsMax.Tables[0].Rows[m][1].ToString();
-                            dtFinal.Rows[m][6] = dsMax.Tables[0].Rows[m][2].ToString();
-
-                            dtFinal.Rows[m][7] = finalUnits[m];
-                        }
-
                     }
-
-
-                    if (ProfileNM == "VMC-NHP-GUJ")
-                    {
-                        //Rain Customized parameter.....
-                        DataRow dr3 = dtFinal.NewRow();
-                        dr3[0] = "Rain";
-                        dr3[3] = RainTotal;
-                        dr3[4] = DateHighRain;
-                        dr3[5] = TimeHighRain;
-                        dr3[6] = HighRain;
-                        dr3[7] = "mm";
-                        dtFinal.Rows.Add(dr3);
-                    }
-                    
                 }
 
 
@@ -2985,10 +3450,11 @@ namespace AWSAPI
                 var objStation = await Request.Content.ReadAsFormDataAsync();
 
                 string fetchQry = string.Empty;
+                string StID = string.Empty;
 
                 if (objStation != null)
                 {
-                    string StID = Regex.Unescape(objStation.Get("StationID"));
+                    StID = Regex.Unescape(objStation.Get("StationID"));
                     string Day = Regex.Unescape(objStation.Get("Day"));
                     string Month = Regex.Unescape(objStation.Get("Month"));
                     string Year = Regex.Unescape(objStation.Get("Year"));
@@ -3045,10 +3511,20 @@ namespace AWSAPI
 
                                     if (Hdata[h].Parameter.ToLower().Contains("wind"))
                                     {
-                                        ObjhistoryData.title = "Dominant Wind Direction";
-                                        string[] WD = Hdata[h].Unit.Split('/');
-                                        ObjhistoryData.paraValue = WD[1];
-                                        ObjhistoryData.paraUnit = "";
+                                        if (StID.StartsWith("BDC00") || StID.StartsWith("ABCDEF01"))
+                                        {
+                                            ObjhistoryData.title = "Dominant Wind Direction";
+                                            string[] WD = Hdata[h].Unit.Split('/');
+                                            ObjhistoryData.paraValue = WD[2].Trim();
+                                            ObjhistoryData.paraUnit = "";
+                                        }
+                                        else
+                                        {
+                                            ObjhistoryData.title = "Low " + Hdata[h].Parameter;
+                                            ObjhistoryData.paraValue = Hdata[h].MinVal;
+                                            ObjhistoryData.dateTime = Hdata[h].DateMin + "@" + Hdata[h].TimeMin;
+                                            ObjhistoryData.paraUnit = Hdata[h].Unit;
+                                        }
                                     }
                                     else if (Hdata[h].Parameter.ToLower().Contains("rain"))
                                     {
@@ -3073,8 +3549,15 @@ namespace AWSAPI
                                         clsHistoryData.title = "High " + Hdata[h].Parameter;
                                     else if (Hdata[h].Parameter.ToLower().Contains("wind dir"))
                                     {
-                                        clsHistoryData.title = "Dominant Wind Direction";
-                                        clsHistoryData.paraUnit = "";
+                                        if (StID.StartsWith("BDC00"))
+                                        {
+                                            clsHistoryData.title = "Dominant Wind Direction";
+                                            clsHistoryData.paraUnit = "";
+                                        }
+                                        else
+                                        {
+                                            clsHistoryData.title = "High " + Hdata[h].Parameter;
+                                        }
                                     }
                                     clsHistoryData.paraValue = Hdata[h].MaxVal;
                                     clsHistoryData.dateTime = Hdata[h].DateMax + "@" + Hdata[h].TimeMax;
@@ -3170,7 +3653,43 @@ namespace AWSAPI
 
                 DataSet dsRainDetail = null;
 
-                if (Profile == "VMC-NHP-GUJ")
+                if (Profile == "VMC-AWS-GUJ")
+                {
+                    CurrDT = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+
+                    string yesterDayDT = string.Empty;
+
+                    yesterDayDT = DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd HH:mm");
+
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsRainDetail = ObjDB.FetchData_SP_StationData("DemoGetStationData_VMC", StIDs, CurrDT, CurrDT, "Web");
+
+                        if (dsRainDetail.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    /*DataTable dtStationHR = new DataTable();
+
+                    if (!string.IsNullOrEmpty(StID))
+                    {
+                        dtStationHR = dsRainDetail.Tables[0].AsEnumerable().Where(row => row.Field<string>("StationID") == StID.Trim()).CopyToDataTable();
+                    }
+
+                    Rdetail.Rain24HR = dtStationHR.Rows[0]["15mins RAINFALL"].ToString();*/
+ 
+                    string strQry = @"select  [StationID],sum(try_cast(RTRIM(LTRIM(replace([15mins RAINFALL], ''' + + ''', ''''))) as decimal(18,2))) as CummulativeRain 
+                                      from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + yesterDayDT.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by StationID";
+
+                    DataTable dtRain24HR = ObjDB.FetchDataTable(strQry, "web");
+                    
+                    if (dtRain24HR.Rows.Count > 0)
+                    {
+                        Rdetail.Rain24HR = dtRain24HR.Rows[0]["CummulativeRain"].ToString();
+                    } 
+                }
+                else if(Profile == "VMC-NHP-GUJ")
                 {
                     CurrDT = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
 
@@ -3181,34 +3700,49 @@ namespace AWSAPI
                             break;
                         Thread.Sleep(1000);
                     }
-                }
-                else if (Profile != "VMC-NHP-GUJ")
-                {
-                    CurrDT = DateTime.Now.ToString("yyyy-MM-dd");
 
+                    DataTable dtStationHR = new DataTable();
+
+                    if (!string.IsNullOrEmpty(StID))
+                    {
+                        dtStationHR = dsRainDetail.Tables[0].AsEnumerable().Where(row => row.Field<string>("StationID") == StID.Trim()).CopyToDataTable();
+                    }
+
+                    Rdetail.Rain24HR = dtStationHR.Rows[0]["Hourly Rainfall"].ToString();
+                }
+                else
+                {
+                    CurrDT = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                    string LastDT = DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd HH:mm");
+                    string CurrentLastDT = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM ( SELECT[StationID], Date,Time,SUM(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + LastDT.Trim() + "' group by [StationID],Date,Time)A group by[StationID]";
+                    DataSet dscurrentDT = ObjDB.FetchDataset(CurrentLastDT, "Web");
                     for (int j = 0; j < 3; j++)
                     {
-                        dsRainDetail = ObjDB.sp_getTotalBurst("GetStationData", StID, CurrDT, CurrDT, "Web");
-                        if (dsRainDetail.Tables.Count > 0)
+
+                        if (dscurrentDT.Tables.Count > 0)
                             break;
                         Thread.Sleep(1000);
                     }
+
+                    Rdetail.Rain24HR = dscurrentDT.Tables[0].Rows[0]["CummulativeRain"].ToString();
                 }
 
-                DataTable dtStationHR = new DataTable();
 
-                if (!string.IsNullOrEmpty(StID))
-                {
-                    dtStationHR = dsRainDetail.Tables[0].AsEnumerable().Where(row => row.Field<string>("StationID") == StID.Trim()).CopyToDataTable();
-                }
 
-                Rdetail.Rain24HR = dtStationHR.Rows[0]["Hourly Rainfall"].ToString();
 
                 //==============================END Calculate 24 HR.....==============================================================
 
                 //================================Calculate Current Rate....=========================================================== 
-
-                string CurrHRSelQry = "select top 1 Date,Time,[Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) Where Date = '" + DateTime.Now.Date.ToString("yyyy-MM-dd") + "' order by Date desc,Time desc";
+                #region current Rain rate remove
+                string CurrHRSelQry = "";
+                if(Profile == "VMC-AWS-GUJ")
+                {
+                     CurrHRSelQry = "select top 1 Date,Time,[Rain Rate] from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) Where Date = '" + DateTime.Now.Date.ToString("yyyy-MM-dd") + "' order by Date desc,Time desc";
+                }
+                else
+                {
+                    CurrHRSelQry = "select top 1 Date,Time,[Hourly Rainfall] from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) Where Date = '" + DateTime.Now.Date.ToString("yyyy-MM-dd") + "' order by Date desc,Time desc";
+                }
 
                 if (Profile == "VMC-NHP-GUJ")
                 {
@@ -3267,247 +3801,478 @@ namespace AWSAPI
                     {
                         if (dsCurrHR.Tables[0].Rows.Count > 0)
                         {
-                            CurrRate = dsCurrHR.Tables[0].Rows[0]["Hourly Rainfall"].ToString();
+                            CurrRate = dsCurrHR.Tables[0].Rows[0]["Rain Rate"].ToString();
                         }
 
                     }
                     Rdetail.CurrentRainRate = CurrRate;
                 }
                 //================================END Calculate Current Rate....=========================================================== 
-
+                #endregion
                 //===============================Calculate CurrentDay,LastDay,LastHour,MonthTotal & YearTotal=============================================
 
-                //Current Day...
-                string CurrDayStartDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "00:00";
-
-                string CurrDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
-                        ,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + CurrDayStartDT + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
-
-                DataSet dsCurrDayTotal = null;
-                for (int j = 0; j < 3; j++)
+                if (Profile == "VMC-AWS-GUJ")
                 {
-                    dsCurrDayTotal = ObjDB.FetchDataset(CurrDayTotal, "web");
-                    if (dsCurrDayTotal.Tables.Count > 0)
-                        break;
-                    Thread.Sleep(1000);
-                }
+                    //Current Day...
+                    string CurrDayStartDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "08:00";
+                    string DT = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
 
-                if (dsCurrDayTotal.Tables[0].Rows.Count > 0)
+                    //string CurrDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
+                    //,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + CurrDayStartDT + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
+                    string CurrDayTotal = "select  [StationID],sum(try_cast(RTRIM(LTRIM(replace([15mins RAINFALL], ''' + + ''', ''''))) as decimal(18,2))) as CummulativeRain from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + CurrDayStartDT.Trim() + "' and  CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + DT.Trim() + "' group by StationID";
+                    DataSet dsCurrDayTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsCurrDayTotal = ObjDB.FetchDataset(CurrDayTotal, "web");
+                        if (dsCurrDayTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsCurrDayTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.CurrentDay = dsCurrDayTotal.Tables[0].Rows[0][1].ToString();
+                    }
+
+                    //Last Day...
+                    string LastDayStartDT = DateTime.Now.Date.AddDays(-1).ToString("yyyy-MM-dd") + " " + "08:15";
+                    string LastCurrDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "08:00";
+
+                    //string LastDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
+                    //,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + LastDayStartDT + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + LastCurrDT.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
+                    string LastDayTotal = "select  [StationID],sum(try_cast(RTRIM(LTRIM(replace([15mins RAINFALL], ''' + + ''', ''''))) as decimal(18,2))) as CummulativeRain from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + LastDayStartDT.Trim() + "' and  CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + LastCurrDT.Trim() + "' group by StationID";
+                    DataSet dsLastDayTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsLastDayTotal = ObjDB.FetchDataset(LastDayTotal, "web");
+                        if (dsLastDayTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsLastDayTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.LastDay = dsLastDayTotal.Tables[0].Rows[0][1].ToString();
+                    }
+
+
+                    //Last Hour...
+                    /*string LastHourDTm = Convert.ToDateTime(CurrDT).AddHours(-1).ToString("yyyy-MM-dd HH:mm");
+                    string LastHourQry = @"select StationID,SUM(try_cast([Hourly Rainfall] as decimal(18,2))) as CummulativeRain from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + LastHourDTm + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + CurrDT + "' group by StationID";
+
+                    DataSet dsLastHour = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsLastHour = ObjDB.FetchDataset(LastHourQry, "web");
+                        if (dsLastHour.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsLastHour.Tables[0].Rows.Count > 0)
+                    {
+
+                        Rdetail.LastHour = dsLastHour.Tables[0].Rows[0][1].ToString();
+
+                    }*/
+
+                    var lastHRain = (from row in dsRainDetail.Tables[0].AsEnumerable()
+                                     where row.Field<string>("StationID") == StID.Trim()
+                                     select new
+                                     {
+                                         lastHour = row.Field<string>("15mins RainFALL"),
+                                     }).FirstOrDefault(); 
+
+
+                    //Month Total....
+                    string MonthEndDT = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                    string MonthStartDT = DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd HH:mm");
+
+                    //string SqlMonTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
+                    //,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + MonthStartDT + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
+                    string SqlMonTotal = "select  [StationID],sum(try_cast(RTRIM(LTRIM(replace([15mins RAINFALL], ''' + + ''', ''''))) as decimal(18,2))) as CummulativeRain from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + MonthStartDT + "' and  CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + MonthEndDT + "' group by StationID";
+                    DataSet dsMonTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsMonTotal = ObjDB.FetchDataset(SqlMonTotal, "web");
+                        if (dsMonTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsMonTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.MonthTotal = dsMonTotal.Tables[0].Rows[0][1].ToString();
+                    }
+
+                    //Year Total...
+                    string YearStartDT = DateTime.Now.AddYears(-1).ToString("yyyy-MM-dd HH:mm");
+                    string YearEndDT = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+
+                    //string SqlYearTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
+                    //,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR] FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + YearStartDT + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
+                    string SqlYearTotal = "select  [StationID],sum(try_cast(RTRIM(LTRIM(replace([15mins RAINFALL], ''' + + ''', ''''))) as decimal(18,2))) as CummulativeRain from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + YearStartDT.Trim() + "' and  CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + YearEndDT.Trim() + "' group by StationID";
+                    DataSet dsYearTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsYearTotal = ObjDB.FetchDataset(SqlYearTotal, "web");
+                        if (dsYearTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsYearTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.YearTotal = dsYearTotal.Tables[0].Rows[0][1].ToString();
+                    }
+
+                }
+                else if (Profile == "VMC-NHP-GUJ")
                 {
-                    Rdetail.CurrentDay = dsCurrDayTotal.Tables[0].Rows[0][1].ToString();
-                }
+                    //Current Day...
+                    string CurrDayStartDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "08:00";
 
-                //Last Day...
-                string LastDayStartDT = DateTime.Now.Date.AddDays(-1).ToString("yyyy-MM-dd") + " " + "08:15";
-                string LastCurrDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "08:00";
+                    string CurrDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
+                        ,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + CurrDayStartDT + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
 
-                string LastDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
+                    DataSet dsCurrDayTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsCurrDayTotal = ObjDB.FetchDataset(CurrDayTotal, "web");
+                        if (dsCurrDayTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsCurrDayTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.CurrentDay = dsCurrDayTotal.Tables[0].Rows[0][1].ToString();
+                    }
+
+                    //Last Day...
+                    string LastDayStartDT = DateTime.Now.Date.AddDays(-1).ToString("yyyy-MM-dd") + " " + "08:15";
+                    string LastCurrDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "08:00";
+
+                    string LastDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
                                ,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + LastDayStartDT + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + LastCurrDT.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
 
-                DataSet dsLastDayTotal = null;
-                for (int j = 0; j < 3; j++)
-                {
-                    dsLastDayTotal = ObjDB.FetchDataset(LastDayTotal, "web");
-                    if (dsLastDayTotal.Tables.Count > 0)
-                        break;
-                    Thread.Sleep(1000);
-                }
+                    DataSet dsLastDayTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsLastDayTotal = ObjDB.FetchDataset(LastDayTotal, "web");
+                        if (dsLastDayTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
 
-                if (dsLastDayTotal.Tables[0].Rows.Count > 0)
-                {
-                    Rdetail.LastDay = dsLastDayTotal.Tables[0].Rows[0][1].ToString();
-                }
+                    if (dsLastDayTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.LastDay = dsLastDayTotal.Tables[0].Rows[0][1].ToString();
+                    }
 
 
-                //Last Hour...
-                /*string LastHourDTm = Convert.ToDateTime(CurrDT).AddHours(-1).ToString("yyyy-MM-dd HH:mm");
-                string LastHourQry = @"select StationID,SUM(try_cast([Hourly Rainfall] as decimal(18,2))) as CummulativeRain from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + LastHourDTm + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + CurrDT + "' group by StationID";
+                    //Last Hour...
+                    /*string LastHourDTm = Convert.ToDateTime(CurrDT).AddHours(-1).ToString("yyyy-MM-dd HH:mm");
+                    string LastHourQry = @"select StationID,SUM(try_cast([Hourly Rainfall] as decimal(18,2))) as CummulativeRain from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + LastHourDTm + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + CurrDT + "' group by StationID";
 
-                DataSet dsLastHour = null;
-                for (int j = 0; j < 3; j++)
-                {
-                    dsLastHour = ObjDB.FetchDataset(LastHourQry, "web");
-                    if (dsLastHour.Tables.Count > 0)
-                        break;
-                    Thread.Sleep(1000);
-                }
+                    DataSet dsLastHour = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsLastHour = ObjDB.FetchDataset(LastHourQry, "web");
+                        if (dsLastHour.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
 
-                if (dsLastHour.Tables[0].Rows.Count > 0)
-                {
+                    if (dsLastHour.Tables[0].Rows.Count > 0)
+                    {
 
-                    Rdetail.LastHour = dsLastHour.Tables[0].Rows[0][1].ToString();
+                        Rdetail.LastHour = dsLastHour.Tables[0].Rows[0][1].ToString();
 
-                }*/
+                    }*/
 
-                var lastHRain = (from row in dsRainDetail.Tables[0].AsEnumerable()
-                                 where row.Field<string>("StationID") == StID.Trim()
-                                 select new
-                                 {
-                                     lastHour = row.Field<string>("Hourly Rainfall"),
-                                 }).FirstOrDefault();
+                    var lastHRain = (from row in dsRainDetail.Tables[0].AsEnumerable()
+                                     where row.Field<string>("StationID") == StID.Trim()
+                                     select new
+                                     {
+                                         lastHour = row.Field<string>("Hourly Rainfall"),
+                                     }).FirstOrDefault();
 
-                //Month Total....
-                string MonthStartDT = Convert.ToDateTime(CurrDT).Year + "-" + Convert.ToDateTime(CurrDT).Month + "-" + "01" + " " + DateTime.Now.ToString("HH:mm");
+                    //Month Total....
+                    string MonthStartDT = Convert.ToDateTime(CurrDT).Year + "-" + Convert.ToDateTime(CurrDT).Month + "-" + "01" + " " + DateTime.Now.ToString("HH:mm");
 
-                string SqlMonTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
+                    string SqlMonTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
                         ,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + MonthStartDT + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
 
-                DataSet dsMonTotal = null;
-                for (int j = 0; j < 3; j++)
-                {
-                    dsMonTotal = ObjDB.FetchDataset(SqlMonTotal, "web");
-                    if (dsMonTotal.Tables.Count > 0)
-                        break;
-                    Thread.Sleep(1000);
-                }
+                    DataSet dsMonTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsMonTotal = ObjDB.FetchDataset(SqlMonTotal, "web");
+                        if (dsMonTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
 
-                if (dsMonTotal.Tables[0].Rows.Count > 0)
-                {
-                    Rdetail.MonthTotal = dsMonTotal.Tables[0].Rows[0][1].ToString();
-                }
+                    if (dsMonTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.MonthTotal = dsMonTotal.Tables[0].Rows[0][1].ToString();
+                    }
 
-                //Year Total...
-                string YearStartDT = Convert.ToDateTime(CurrDT).Year + "-" + "01" + "-" + "01" + " " + DateTime.Now.ToString("HH:mm");
+                    //Year Total...
+                    string YearStartDT = Convert.ToDateTime(CurrDT).Year + "-" + "01" + "-" + "01" + " " + DateTime.Now.ToString("HH:mm");
 
-                string SqlYearTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
+                    string SqlYearTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM(SELECT[StationID], DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime)) / 3600 * 3600 , '1970-01-01') AS[DATEHOUR]
                         ,MAX(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR] FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + YearStartDT + "' and CAST([Date] AS datetime) +CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by DATEADD(second, DATEDIFF(second, '1970-01-01', CAST([Date] AS datetime) + CAST(DATEADD(minute, -15, CAST([Time] AS datetime)) AS datetime))/ 3600 * 3600 , '1970-01-01'),[StationID])A group by[StationID]";
 
-                DataSet dsYearTotal = null;
-                for (int j = 0; j < 3; j++)
-                {
-                    dsYearTotal = ObjDB.FetchDataset(SqlYearTotal, "web");
-                    if (dsYearTotal.Tables.Count > 0)
-                        break;
-                    Thread.Sleep(1000);
-                }
+                    DataSet dsYearTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsYearTotal = ObjDB.FetchDataset(SqlYearTotal, "web");
+                        if (dsYearTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
 
-                if (dsYearTotal.Tables[0].Rows.Count > 0)
-                {
-                    Rdetail.YearTotal = dsYearTotal.Tables[0].Rows[0][1].ToString();
-                }
+                    if (dsYearTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.YearTotal = dsYearTotal.Tables[0].Rows[0][1].ToString();
+                    }
 
+                }
+                else
+                {
+                    //Current Day...
+                    string CurrDayStartDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "08:00";
+
+                    string CurrDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM( SELECT[StationID], Date,Time 
+                    ,SUM(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + CurrDayStartDT + "' group by [StationID],Date,Time)A group by[StationID]";
+
+                    DataSet dsCurrDayTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsCurrDayTotal = ObjDB.FetchDataset(CurrDayTotal, "web");
+                        if (dsCurrDayTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsCurrDayTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.CurrentDay = dsCurrDayTotal.Tables[0].Rows[0][1].ToString();
+                    }
+
+
+                    //Last Day...
+                    string LastDayStartDT = DateTime.Now.Date.AddDays(-1).ToString("yyyy-MM-dd") + " " + "08:15";
+                    string LastCurrDT = DateTime.Now.ToString("yyyy-MM-dd") + " " + "08:00";
+
+                    string LastDayTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM (
+                     SELECT[StationID], Date,Time,SUM(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + LastDayStartDT.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + LastCurrDT.Trim() + "' group by [StationID],Date,Time )A group by[StationID]";
+
+                    DataSet dsLastDayTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsLastDayTotal = ObjDB.FetchDataset(LastDayTotal, "web");
+                        if (dsLastDayTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsLastDayTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.LastDay = dsLastDayTotal.Tables[0].Rows[0][1].ToString();
+                    }
+
+                    //Last Hour
+                    if (Profile != "Forest-GOA-AWS")
+                    {
+
+                        var lastHRain = (from row in dsRainDetail.Tables[0].AsEnumerable()
+                                         where row.Field<string>("StationID") == StID.Trim()
+                                         select new
+                                         {
+                                             lastHour = row.Field<string>("Hourly Rainfall"),
+                                         }).FirstOrDefault();
+                    }
+                    else
+                    {
+                        string getCurrDT = "select top 1 Date,Time from tbl_StationData_" + StID.Trim() + " order by Date desc,Time desc";
+                        DataTable dtCurrDT = ObjDB.FetchDataTable(getCurrDT, "web");
+
+                        if (dtCurrDT.Rows.Count > 0)
+                        {
+
+                            DateTime dTm = Convert.ToDateTime(dtCurrDT.Rows[0][0] + " " + dtCurrDT.Rows[0][1]);
+                            string frHRDT = dTm.ToString("yyyy-MM-dd HH:mm");
+                            string toHRDT = dTm.AddMinutes(-60).ToString("yyyy-MM-dd HH:mm");
+
+                            string lastHRain = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM ( SELECT[StationID], Date,Time,SUM(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + frHRDT.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + toHRDT.Trim() + "' group by [StationID],Date,Time)A group by[StationID]";
+                            DataTable dtlastHR = ObjDB.FetchDataTable(lastHRain, "web");
+
+                            if (dtlastHR.Rows.Count > 0)
+                            {
+                                var lastHR = dtlastHR.Rows[0]["CummulativeRain"].ToString();
+                                Rdetail.LastHour = lastHR;
+                            }
+
+                        }
+                    }
+
+                    //Month Total....
+                    string MonthStartDT = Convert.ToDateTime(CurrDT).Year + "-" + Convert.ToDateTime(CurrDT).Month + "-" + "01";
+
+                    string MonthSDT = Convert.ToDateTime(MonthStartDT).ToString("yyyy-MM-dd");
+
+                    string SqlMonTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM (
+                     SELECT[StationID], Date,Time,SUM(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + MonthSDT.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by [StationID],Date,Time )A group by[StationID]";
+
+                    DataSet dsMonTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsMonTotal = ObjDB.FetchDataset(SqlMonTotal, "web");
+                        if (dsMonTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsMonTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.MonthTotal = dsMonTotal.Tables[0].Rows[0][1].ToString();
+                    }
+
+                    //Year Total...
+                    string YearStartDT = Convert.ToDateTime(CurrDT).Year + "-" + "01" + "-" + "01";
+
+                    string SqlYearTotal = @"SELECT[StationID], SUM([MAXHOUR]) as CummulativeRain FROM (
+                     SELECT[StationID], Date,Time,SUM(try_cast(RTRIM(LTRIM(replace([Hourly Rainfall], ''' + + ''', ''''))) as decimal(18,2))) AS[MAXHOUR]  FROM tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) + CAST([Time] AS datetime) >= '" + YearStartDT.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by [StationID],Date,Time )A group by[StationID]";
+
+                    DataSet dsYearTotal = null;
+                    for (int j = 0; j < 3; j++)
+                    {
+                        dsYearTotal = ObjDB.FetchDataset(SqlYearTotal, "web");
+                        if (dsYearTotal.Tables.Count > 0)
+                            break;
+                        Thread.Sleep(1000);
+                    }
+
+                    if (dsYearTotal.Tables[0].Rows.Count > 0)
+                    {
+                        Rdetail.YearTotal = dsYearTotal.Tables[0].Rows[0][1].ToString();
+                    }
+
+
+                }
 
                 //===============================END Calculate Month Total & Year Total========================================= 
 
 
                 #region RAIN STORM
-                /*
-             //========================Calculate RainStorm===================================================================
+                var CRDate = DateTime.Now.ToString("yyyy-MM-dd");
+                string SelectDB = "";
+                if (Profile == "VMC-AWS-GUJ")
+                {
+                     SelectDB = "Select StationID,Date,Time,[15mins RainFALL] From tbl_StationData_" + StID.Trim() + " Where Date = '" + CRDate.Trim() + "' order by Date asc, Time asc";
+                }
+                else if(Profile == "VMC-NHP-GUJ")
+                {
+                    SelectDB = "Select StationID,Date,Time,[Hourly Rainfall] From tbl_StationData_" + StID.Trim() + " Where Date = '" + CRDate.Trim() + "' order by Date asc, Time asc";
+                }
+                var dsHRain = ObjDB.FetchDataset(SelectDB, "web");
 
-             //1) Get Curr 15 min rainfall(HourlyRainfall) && Remove Summation from rainfall (Hourly Rainfall)....
-             string Curr15MinActualHR = DiffHR == 0 ? "000.0" : String.Format("{0:000.0}", DiffHR);
+                if (dsHRain.Tables[0].Rows.Count > 0)
+                {
+                    double finalHRVal = 0.0;
+                    string StromVal = string.Empty;
+                    string stromDuration = string.Empty;
+                    string startDTStrom = "";
+                    string endDTStorm = "";
 
-             //2) Get Rowcount from tbl_Rainstorm....    
-             DataSet dsRSRecord = ObjDB.FetchDataset("select count(1) from tbl_RainStorm", "web");
+                    bool flgStartDT = false;
 
-             int cnt = 0;
+                    int CntZeroHRain = 0;
 
-             if (dsRSRecord.Tables.Count > 0)
-             {
-                 if (dsRSRecord.Tables[0].Rows.Count > 0)
-                 {
-                     if (Convert.ToInt32(dsRSRecord.Tables[0].Rows[0][0]) <= 0)
-                     {
-                         if (Convert.ToDouble(Curr15MinActualHR) >= 1)
-                         {
-                             Rdetail.StormRate = Convert.ToDouble(Curr15MinActualHR).ToString();
-                             Rdetail.StormStartDateTime = DateTime.Now.ToString("yyyy-MM-dd") + " " + CurrTm;
-                             Rdetail.StormDuration = "15 min";
-                         }
-                         else if (Convert.ToDouble(Curr15MinActualHR) < 1)
-                         {
-                             Rdetail.StormRate = "0";
-                             Rdetail.StormStartDateTime = DateTime.Now.ToString("yyyy-MM-dd") + " " + CurrTm;
-                             Rdetail.StormDuration = "0";
-                         }
-                     }
-                     else if (Convert.ToInt32(dsRSRecord.Tables[0].Rows[0][0]) > 0)
-                     {
-                         //string GetPastSDT = "select top 1 StationID,StormRate,StormDateTime,StormDuration from tbl_RainStorm where StationID='" + StID.Trim() + "' order by try_cast(StormDateTime as DateTime) desc ";
-                         string GetPastSDT = "select top 1 StationID,StormRate,StormDateTime,StormDuration from tbl_RainStorm where StationID='" + StID.Trim() + "'";
-                         DataSet dsPastDT = ObjDB.FetchDataset(GetPastSDT, "web");
+                    DateTime dTmStartStom = Convert.ToDateTime(DateTime.Now.ToString("yyyy-MM-dd"));
 
-                         string strPastDT = string.Empty;
-                         string strPastSR = string.Empty;
+                    for (int r = 0; r < dsHRain.Tables[0].Rows.Count; r++)
+                    {
+                        #region 15 min summation remove logic is delete
+                        double HRain = 000.0;
+                        if(Profile == "VMC-NHP-GUJ")
+                        {
+                            string stHRain = funRemoveSummationHR(dsHRain, StID, r); // <-- dt.Rows[r][HR] -- 15 Min summation remove
 
-                         if (dsPastDT.Tables.Count > 0)
-                         {
-                             if (dsPastDT.Tables[0].Rows.Count > 0)
-                             {
-                                 strPastSR = dsPastDT.Tables[0].Rows[0]["StormRate"].ToString();
-                                 strPastDT = dsPastDT.Tables[0].Rows[0]["StormDateTime"].ToString();
-                             }
-                         }
+                            if (stHRain.Length != 0)
+                            {
+                                HRain = Convert.ToDouble(stHRain);
+                            }
+                        }
+                        //string stHRain = funRemoveSummationHR(dsHRain, StID, r); // <-- dt.Rows[r][HR] -- 15 Min summation remove
+                        else
+                        {
+                            HRain = Convert.ToDouble(dsHRain.Tables[0].Rows[r]["15mins RainFALL"]);
+                        }
+                        #endregion
+                         
+                        if (HRain >= 000.5)
+                        {
+                            if (flgStartDT == false)
+                            {
+                                startDTStrom = dsHRain.Tables[0].Rows[r][1] + " " + dsHRain.Tables[0].Rows[r][2];
+                                dTmStartStom = Convert.ToDateTime(startDTStrom).AddMinutes(-15);
 
-                         string strCurrDT = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                                flgStartDT = true;
+                            }
+                            //else
+                            //endDTStorm = dt.Rows[r][Date] + " " +  dt.Rows[r][Time];
 
-                         string GetSRData = "select * from tbl_StationData_" + StID.Trim() + " where cast(concat(Date , ' ' , Time) as DateTime) >= cast('" + strPastDT + "' as DateTime) and  cast(concat(Date , ' ' , Time) as DateTime) <= cast('" + strCurrDT + "' as DateTime) order by ID";
-                         DataSet dsPastRecord = ObjDB.FetchDataset(GetSRData, "web");
 
-                         if (dsPastRecord.Tables.Count > 0)
-                         {
-                             if (dsPastRecord.Tables[0].Rows.Count > 0)
-                             {
-                                 int RainDuration = 15;
+                        }
+                        else
+                        {
+                            CntZeroHRain++;
+                        }
 
-                                 for (int r = 0; r < dsPastRecord.Tables[0].Rows.Count; r++)
-                                 {
-                                     //Remove Summation from   ==> Convert.ToDouble(dsPastRecord.Tables[0].Rows[r]["Hourly Rainfall"])
-                                     string finalHR = funRemoveSummationHR(dsPastRecord, StID.Trim(), r);
+                        endDTStorm = dsHRain.Tables[0].Rows[r][1] + " " + dsHRain.Tables[0].Rows[r][2];
+                        finalHRVal = finalHRVal + HRain;
 
-                                     if (Convert.ToDouble(finalHR) > 1)
-                                     {
-                                         if (Convert.ToDouble(strPastSR) == 0)
-                                         {
-                                             Rdetail.StormRate = strPastSR + finalHR;
-                                             Rdetail.StormStartDateTime = strCurrDT;
-                                             Rdetail.StormDuration = RainDuration + "min";
+                        if (CntZeroHRain == 96)
+                        {
 
-                                         }
-                                         else if (Convert.ToDouble(strPastSR) != 0)
-                                         {
-                                             Rdetail.StormRate = strPastSR + finalHR;
-                                             Rdetail.StormStartDateTime = strPastDT;
+                            dTmStartStom = Convert.ToDateTime(DateTime.Now.ToString("0000-00-00"));
+                            StromVal = "--";
+                            stromDuration = "--";
+                        }
+                        else
+                        {
 
-                                             //Total minutes...
-                                             Rdetail.StormDuration = strPastDT + RainDuration;
+                            TimeSpan timeDifference = new TimeSpan(0, 00, 0);
 
-                                         }
-                                         cnt = 0;
-                                     }
-                                     else if (Convert.ToDouble(finalHR) < 0.1)
-                                     {
-                                         cnt++;
+                            timeDifference = Convert.ToDateTime(endDTStorm) - dTmStartStom;
 
-                                         if (cnt > 24)
-                                         {
-                                             Rdetail.StormRate = "--";
-                                             Rdetail.StormStartDateTime = "--";
-                                             Rdetail.StormDuration = "--";
-                                             cnt = 0;
-                                         }
-                                     }
-                                 }
 
-                             }
+                            int days = timeDifference.Days;
+                            double hours = timeDifference.TotalHours;
+                            //double StromDuration = timeDifference.TotalDays;
+                            //stromDurastion   = diff (0 Days 0 Hours)
+                            StromVal = finalHRVal.ToString("F2");
+                            stromDuration = days.ToString() + " Days " + hours.ToString() + " Hours";
 
-                         }
-                     }
+                        }
+                    }
 
-                 }
+                    Rdetail.StormValue = StromVal;
+                    Rdetail.StormStartDateTime = dTmStartStom.ToString("dd-MM-yyyy HH:mm");
+                    Rdetail.StormDuration = stromDuration;
+                }
 
-             }
+                LstRainDetail.Add(Rdetail);
 
-             //========================END Calculate RainStorm==================================================================
-                */
+                //========================END Calculate RainStorm==================================================================
+
 
                 #endregion RAIN STROM
 
-                Rdetail.StormRate = "--";
-                Rdetail.StormStartDateTime = "--";
-                Rdetail.StormDuration = "--";
 
-                LstRainDetail.Add(Rdetail);
 
                 return LstRainDetail;
             }
@@ -3567,7 +4332,7 @@ namespace AWSAPI
                 }
                 else if (CurrTm == "00:00")
                 {
-                    DateTime PreDT = Convert.ToDateTime(dsRainSR.Tables[0].Rows[RowIndex]["Date"].ToString()).AddDays(-1);
+                    DateTime PreDT = Convert.ToDateTime(dsRainSR.Tables[0].Rows[RowIndex]["Date"].ToString());
                     string finalPreDT = PreDT.ToString("yyyy-MM-dd");
 
                     //string finalPreDT = "2023-03-15";
@@ -4110,7 +4875,15 @@ namespace AWSAPI
 
                     for (int j = 0; j < 3; j++)
                     {
-                        dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
+                        dsSTData = ObjDB.sp_getTotalBurst("rpt_DataReport", StID, frDT, toDT, "Web");
+
+                        if (dsSTData.Tables[0].Columns.Contains("Peripheral Status"))
+                            dsSTData.Tables[0].Columns.Remove("Peripheral Status");
+
+                        if (dsSTData.Tables[0].Columns.Contains("Created Date"))
+                            dsSTData.Tables[0].Columns.Remove("Created Date");
+
+
                         if (dsSTData.Tables.Count > 0)
                             break;
                         Thread.Sleep(1000);
@@ -4242,5 +5015,175 @@ namespace AWSAPI
 
         }
 
+        [HttpPost]
+        [Route("webuistationdataap")]
+
+        public async Task<HttpResponseMessage> WebUIStationDataAP()
+        {
+
+            strFunctionName = "WEB UI - Fetch Stations Data a/c to selected duration";
+
+            var objStation = await Request.Content.ReadAsFormDataAsync();
+
+            List<clsStationDetail> lstStationData = new List<clsStationDetail>();
+
+            try
+            {
+                if (objStation != null)
+                {
+                    string StID = Regex.Unescape(objStation.Get("StationID"));
+                    string frDT = (Regex.Unescape(objStation.Get("fromDate")) == null || Regex.Unescape(objStation.Get("fromDate")) == "") ? "" : Regex.Unescape(objStation.Get("fromDate"));
+                    string toDT = (Regex.Unescape(objStation.Get("toDate")) == null || Regex.Unescape(objStation.Get("toDate")) == "") ? "" : Regex.Unescape(objStation.Get("toDate"));
+                    string status = Regex.Unescape(objStation.Get("Status"));
+                    List<string> stringList = new List<string>();
+
+
+                    string[] array = StID.Split(',');
+
+
+                    stringList.AddRange(array);
+
+                    for (int i = 0; i < stringList.Count; i++)
+                    {
+                        string selqry = @"select pm.Name,pm.SensorName,srm.unit,srm.ValidationString,sm.Name as StationName,sm.District,sm.ShowInGraph,sm.ShowInGrid from [tbl_StationMaster ] sm join tbl_StationRangeValidation srm on
+                    sm.Profile=srm.ProfileName join tbl_ProfileMaster pm on sm.Profile = pm.Name where sm.StationID='" + stringList[i].Trim() + "'";
+
+                        string stUnit = string.Empty;
+                        string ProfileName = string.Empty;
+                        string StationName = string.Empty;
+                        string Location = string.Empty;
+                        List<string> units = new List<string>();
+
+                        DataSet dsUnit = null;
+                        for (int j = 0; j < 3; j++)
+                        {
+                            dsUnit = ObjDB.FetchDataset(selqry, "Web");
+                            if (dsUnit.Tables.Count > 0)
+                                break;
+                            Thread.Sleep(1000);
+                        }
+
+                        if (dsUnit.Tables[0].Rows.Count > 0)
+                        {
+                            ProfileName = dsUnit.Tables[0].Rows[0]["Name"].ToString();
+                            StationName = dsUnit.Tables[0].Rows[0]["StationName"].ToString();
+                            Location = dsUnit.Tables[0].Rows[0]["District"].ToString();
+                            string[] displaypara = dsUnit.Tables[0].Rows[0]["ShowInGraph"].ToString().Split(',');
+                            string[] sname = dsUnit.Tables[0].Rows[0]["SensorName"].ToString().Split(',');
+                            units = dsUnit.Tables[0].Rows[0]["unit"].ToString().Split(',').ToList();
+
+                            for (int u = 0; u < displaypara.Length; u++)
+                            {
+                                if (units[u].Trim() == "C")
+                                {
+                                    units[u] = "°C";
+                                }
+                                else if (units[u].Trim().ToLower().Contains("deg"))
+                                    units[u] = "◦";
+
+                                if (displaypara[u].Trim() == "1")
+                                {
+                                    stUnit += units[u] + ",";
+                                }
+                            }
+                        }
+
+                        //Last24Hour Data.....
+                        DataSet dsSTData = null;
+
+                        for (int j = 0; j < 3; j++)
+                        {
+                            dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationDataAP]", stringList[i].Trim(), frDT, toDT, status, "Web");
+                            if (dsSTData.Tables.Count > 0)
+                                break;
+                            Thread.Sleep(1000);
+                        }
+                        for (int j = dsSTData.Tables[0].Rows.Count - 1; j >= 0; j--)
+                        {
+                            DataRow row = dsSTData.Tables[0].Rows[j];
+                            if (row["Status"].Equals("Delhi"))
+                            {
+                                dsSTData.Tables[0].Rows.RemoveAt(j);
+                            }
+                        }
+                        if (dsSTData.Tables.Count > 0)
+                        {
+
+                            if (dsSTData.Tables[0].Rows.Count > 0)
+                            {
+                                string[] finalUnit = stUnit.Split(',');
+
+                                List<string> columnNameList = dsSTData.Tables[0].Columns.Cast<DataColumn>().Where(x => x.ColumnName != "Status" && x.ColumnName != "Created Date")
+                                                .Select(x => x.ColumnName)
+                                                .ToList();
+
+                                string[] NewUnit = stUnit.TrimEnd(',').Split(',');
+
+                                if (ProfileName.Contains("NHPAP"))
+                                {
+                                    for (int s = 0; s < dsSTData.Tables[0].Rows.Count; s++)
+                                    {
+
+                                        clsStationDetail stationDetail = new clsStationDetail();
+
+                                        stationDetail.StationID = dsSTData.Tables[0].Rows[s]["StationID"].ToString();
+                                        stationDetail.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
+                                        stationDetail.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
+                                        stationDetail.StationType = ProfileName;
+                                        stationDetail.StationName = StationName;
+                                        stationDetail.Location = Location;
+                                        stationDetail.Status = "";
+
+                                        List<clsParaDetail> lstparaDetails = new List<clsParaDetail>();
+
+                                        for (int c = 3; c < columnNameList.Count; c++)
+                                        {
+                                            clsParaDetail paraDetail = new clsParaDetail();
+                                            paraDetail.ParameterName = dsSTData.Tables[0].Columns[c].ToString();
+                                            paraDetail.ParameterValue = dsSTData.Tables[0].Rows[s][c].ToString();
+                                            paraDetail.ParameterUnit = (NewUnit[c] == "NA" ? "" : NewUnit[c]);
+                                            lstparaDetails.Add(paraDetail);
+
+                                        }
+
+                                        stationDetail.ParaDetails = lstparaDetails;
+                                        lstStationData.Add(stationDetail);
+                                    }
+
+
+                                }
+
+
+
+                                else
+                                {
+                                    return Request.CreateResponse(HttpStatusCode.OK, "No Data Exists");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            return Request.CreateResponse(HttpStatusCode.OK, "No Data Exists");
+                        }
+                    }
+
+
+                }
+
+                return Request.CreateResponse(HttpStatusCode.OK, lstStationData);
+            }
+            catch (Exception Ex)
+            {
+                strExceptionMessage = Ex.Message;
+
+                string tmpExData = "";
+                tmpExData = strModuleName + "#" + strFunctionName + "#" + strExceptionMessage + "#" + clsGlobalData.strExceptionFileName + "#" + clsGlobalData.strLoc_ExceptionFile;
+
+                bool ExcpMesg = ObjEx.WriteIntoExceptionFile(tmpExData);
+
+                return Request.CreateResponse(HttpStatusCode.OK, lstStationData);
+            }
+
+        }
     }
 }

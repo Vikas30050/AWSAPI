@@ -772,6 +772,7 @@ namespace AWSAPI.HelperClass
 
                     SelCmd.Parameters.AddWithValue("@TableName", tblname);
 
+                    SelCmd.CommandTimeout = 300;
 
                     da = new SqlDataAdapter(SelCmd);
 
@@ -2365,6 +2366,7 @@ namespace AWSAPI.HelperClass
                     SelCmd.Parameters.AddWithValue("@Uname", Uname);
                     SelCmd.Parameters.AddWithValue("@Pwd", Pwd);
 
+                    SelCmd.CommandTimeout = 300;
 
                     da = new SqlDataAdapter(SelCmd);
 
@@ -2446,6 +2448,8 @@ namespace AWSAPI.HelperClass
                     SelCmd.Parameters.AddWithValue("@fromDate", fromDt);
                     SelCmd.Parameters.AddWithValue("@toDate", toDt);
 
+                    SelCmd.CommandTimeout = 300;
+
                     da = new SqlDataAdapter(SelCmd);
 
                     ds = new DataSet();
@@ -2521,7 +2525,7 @@ namespace AWSAPI.HelperClass
                     SelCmd.CommandText = spname;
                     SelCmd.CommandType = CommandType.StoredProcedure;
 
-                    if (spname == "[AWSAPI].[GenericStationData]")
+                    if (spname == "[AWSAPI].[DemoGenericStationData]")
                     {
                         SelCmd.Parameters.AddWithValue("@Profile", StID);
                         SelCmd.Parameters.AddWithValue("@StationIDList", fromDt);
@@ -2535,6 +2539,16 @@ namespace AWSAPI.HelperClass
                         SelCmd.Parameters.AddWithValue("@toDate", toDt);
                         SelCmd.Parameters.AddWithValue("@Status", Status);
                     }
+                    else if (spname == "[AWSAPI].[GenericStationData]")
+                    {
+                        SelCmd.Parameters.AddWithValue("@Profile", StID);
+                        SelCmd.Parameters.AddWithValue("@StationIDList", fromDt);
+                        SelCmd.Parameters.AddWithValue("@fromDate", toDt);
+                        SelCmd.Parameters.AddWithValue("@toDate", Status);
+                    }
+
+                    SelCmd.CommandTimeout = 300;
+
                     da = new SqlDataAdapter(SelCmd);
 
                     ds = new DataSet();
@@ -2618,6 +2632,8 @@ namespace AWSAPI.HelperClass
                     SelCmd.Parameters.AddWithValue("@fromDate", fromDt);
                     SelCmd.Parameters.AddWithValue("@toDate", toDt);
                     SelCmd.Parameters.AddWithValue("@Status", Status);
+
+                    SelCmd.CommandTimeout = 300;
 
                     da = new SqlDataAdapter(SelCmd);
 
@@ -2767,6 +2783,8 @@ namespace AWSAPI.HelperClass
                     SelCmd.Parameters.AddWithValue("@toDate", toDate);
                     SelCmd.Parameters.AddWithValue("@Status", Status);
 
+                    SelCmd.CommandTimeout = 300;
+
                     da = new SqlDataAdapter(SelCmd);
 
                     ds = new DataSet();
@@ -2843,6 +2861,8 @@ namespace AWSAPI.HelperClass
                     SelCmd.Parameters.AddWithValue("@toDate", toDate);
                     SelCmd.Parameters.AddWithValue("@Status", Status);
                     SelCmd.Parameters.AddWithValue("@Last24Status", Last24Status == null ? (object)DBNull.Value : Last24Status);
+
+                    SelCmd.CommandTimeout = 300;
 
                     da = new SqlDataAdapter(SelCmd);
 

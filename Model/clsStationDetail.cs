@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 using System.Web;
 
 namespace AWSAPI.Model
@@ -188,9 +189,10 @@ namespace AWSAPI.Model
     }
     public class Rain
     {
-        public double _1h { get; set; }
-        public double hr { get; set; }
+         public double _1h { get; set; }
+         public double hr { get; set; }
     }
+
     public class Root
     {
         public double lat { get; set; }
@@ -293,7 +295,7 @@ namespace AWSAPI.Model
 
         public string CurrentRainRate { get; set; }
 
-        public string StormRate { get; set; }
+        public string StormValue { get; set; }
 
         public string StormUnit { get; set; }
 
