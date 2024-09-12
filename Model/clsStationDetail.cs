@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
@@ -189,8 +190,11 @@ namespace AWSAPI.Model
     }
     public class Rain
     {
-         public double _1h { get; set; }
-         public double hr { get; set; }
+        [JsonProperty("1h")]
+        //Change by vikas --> 29-07-2024
+        //public double _1h { get; set; }
+        public double onehour { get; set; }
+        public double hr { get; set; }
     }
 
     public class Root

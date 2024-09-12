@@ -1,6 +1,7 @@
 ﻿using AWSAPI.HelperClass;
 using AWSAPI.Model;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -14,10 +15,12 @@ using System.Net.Mail;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web.DynamicData;
 using System.Web.Http;
 
 namespace AWSAPI
 {
+    [Route("awsapi")]
     public class AWSAPIController : ApiController
     {
         AWSDatabaseContext db = new AWSDatabaseContext();
@@ -134,7 +137,7 @@ namespace AWSAPI
                 string CurrDT = DateTime.Now.ToString("yyyy-MM-dd HH:MM:ss");
 
                 DataSet dsStationdetail = null;
-                if(Profile == "VMC-AWS-GUJ")
+                if (Profile == "VMC-AWS-GUJ")
                 {
                     for (int j = 0; j < 3; j++)
                     {
@@ -284,8 +287,8 @@ namespace AWSAPI
 
                                 //strParaAliasNm = strParaAliasNm.TrimEnd(',');
                                 List<string> lstParaAliasNm = strParaAliasNm.Split(',').ToList();
-                                
-                                if(Profile == "VMC-AWS-GUJ")
+
+                                if (Profile == "VMC-AWS-GUJ")
                                 {
                                     lstParaAliasNm.RemoveAt(lstParaAliasNm.Count - 2);
                                 }
@@ -308,8 +311,8 @@ namespace AWSAPI
                                             else if (lstDisplayColumn[c].ToString().ToLower().Contains("wind dir"))
                                                 lstUnitColumn[c] = "°";
                                             else if (lstDisplayColumn[c].ToString().ToLower().Contains("high dir"))
-                                                if(Profile == "VMC-AWS-GUJ")
-                                                lstDisplayColumn[c] = "WIND DIRECTION AT MAX WIND SPEED";
+                                                if (Profile == "VMC-AWS-GUJ")
+                                                    lstDisplayColumn[c] = "WIND DIRECTION AT MAX WIND SPEED";
                                             clsParaSummaryDetail paraSummary = new clsParaSummaryDetail();
                                             paraSummary.ParameterName = lstParaAliasNm[c].Trim(); //lstDisplayColumn[c].ToString();
                                             string paraType = funSensorType(lstDisplayColumn[c].ToString());
@@ -451,7 +454,7 @@ namespace AWSAPI
         #region Station DataMinMax Detail
 
         [HttpPost]
-        [Route("StDataMinMax")] 
+        [Route("StDataMinMax")]
         public async Task<HttpResponseMessage> PostFinalStationDataMinMax()
         {
             strFunctionName = "Send Station Data with MinMax detail Async";
@@ -518,7 +521,7 @@ namespace AWSAPI
                     for (int j = 0; j < 3; j++)
                     {
                         dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
-                        if(ProfileName == "VMC-AWS-GUJ")
+                        if (ProfileName == "VMC-AWS-GUJ")
                         {
                             dsSTData.Tables[0].Columns.Remove("Status");
                         }
@@ -1033,8 +1036,8 @@ namespace AWSAPI
                                 {
                                     for (int c = 3; c < reportDT.Columns.Count; c++)
                                     {
-                                        
-                                        if (finalcolList[c] != "15mins RAINFALL" && finalcolList[c] != "Daily Rain" && finalcolList[c] != "HIGH DIRECTION" && finalcolList[c] != "WIND GUST"  && finalcolList[c] != "RAIN RATE")
+
+                                        if (finalcolList[c] != "15mins RAINFALL" && finalcolList[c] != "Daily Rain" && finalcolList[c] != "HIGH DIRECTION" && finalcolList[c] != "WIND GUST" && finalcolList[c] != "RAIN RATE")
                                         {
                                             if (finalcolList[c] == "Wind Speed")
                                             {
@@ -1081,7 +1084,7 @@ namespace AWSAPI
                                                         reportDT.Rows[r][c] = "00.0";
                                                     }
 
-                                                    graphBarDataWG.ParameterValue = reportDT.Rows[r]["WIND GUST"].ToString(); 
+                                                    graphBarDataWG.ParameterValue = reportDT.Rows[r]["WIND GUST"].ToString();
                                                     graphBarDataWG.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
                                                     LstgraphBarDataWG.Add(graphBarDataWG);
 
@@ -1147,7 +1150,7 @@ namespace AWSAPI
 
                                 }
                             }
-                            else if(ProfileName.Trim() == "VMC-NHP-GUJ")
+                            else if (ProfileName.Trim() == "VMC-NHP-GUJ")
                             {
                                 string[] columnNames = dsSTData.Tables[0].Columns.Cast<DataColumn>().Select(x => x.ColumnName).ToArray();
 
@@ -1878,7 +1881,7 @@ namespace AWSAPI
                     reportset = ObjDB.sp_getTotalBurst_Status("GetStationDataLast24", StID, fromDate, toDate, status, "Web");
                     string prname = "select profile from [tbl_StationMaster] where StationID = '" + StID + "'";
                     DataTable Pname = ObjDB.FetchDataTable(prname, "Web");
-                    if(Pname.Rows[0][0].ToString() == "VMC-AWS-GUJ")
+                    if (Pname.Rows[0][0].ToString() == "VMC-AWS-GUJ")
                     {
                         reportset.Tables[0].Columns.Remove("Status");
                     }
@@ -2226,11 +2229,11 @@ namespace AWSAPI
 
                     if (getUnit == null)
                     {
-                        if(sensorName != "Status")
+                        if (sensorName != "Status")
                         {
                             ReportcolumnName += columnDataTable.Rows[i][0].ToString() + ",";
                         }
-                        
+
                     }
                     else
                     {
@@ -2373,7 +2376,6 @@ namespace AWSAPI
                         //string lat = "22.380133939179974";
                         //string lng = "73.38287637777758";
 
-
                         //function check if data availiable 
                         //if availiable then
                         // return json from file
@@ -2415,6 +2417,7 @@ namespace AWSAPI
 
                         for (int j = 0; j < objroot.hourly.Count; j++)
                         {
+
                             if (j < objroot.daily.Count)
                             {
                                 clsDailyValues dailyValues = new clsDailyValues();
@@ -2518,13 +2521,14 @@ namespace AWSAPI
                                 LstdynamicHourlyData.Add(dynamicHourlyData4);
 
                                 clsDynamicHourlyData dynamicHourlyData5 = new clsDynamicHourlyData();
-                                double rain = objroot.hourly[j].rain != null ? objroot.hourly[j].rain.hr : 0;
+                                //Change by vikas --> 29-07-2024
+                                //double rain = objroot.hourly[j].rain != null ? objroot.hourly[j].rain.hr : 0;
+                                double rain = objroot.hourly[j].rain != null ? objroot.hourly[j].rain.onehour : 0;
                                 dynamicHourlyData5.hourlyParaValue = rain.ToString();
                                 dynamicHourlyData5.hourlyParaUnit = "mm";
                                 LstdynamicHourlyData.Add(dynamicHourlyData5);
 
                                 clsDynamicHourlyData dynamicHourlyData6 = new clsDynamicHourlyData();
-
                                 //CHANGE BY VIKAS --> 26-Jul-2024
                                 //int pop = (int)objroot.hourly[j].pop;
                                 //dynamicHourlyData6.hourlyParaValue = pop.ToString();
@@ -2790,7 +2794,7 @@ namespace AWSAPI
 
                     string fromDate = "";
                     string toDate = "";
-                    
+
                     if (!string.IsNullOrEmpty(day) && !string.IsNullOrEmpty(month) && !string.IsNullOrEmpty(year))
                     {
                         int monthNumber = DateTime.ParseExact(month, "MMM", CultureInfo.CurrentCulture).Month;
@@ -2842,14 +2846,14 @@ namespace AWSAPI
                     }
 
                     string ProfileNM = dtUnit.Tables[0].Rows[0]["Name"].ToString();
-                    if(ProfileNM == "VMC-AWS-GUJ")
+                    if (ProfileNM == "VMC-AWS-GUJ")
                     {
                         DataSet dsMin = null;
 
                         for (int j = 0; j < 3; j++)
                         {
                             dsMin = ObjDB.sp_MinMaxStationData_Status("rpt_DemoDataReport_MinMaxUnit_NewVMCHistory", StID, fromDate, toDate, "MinVal", "", "Web");
-                            
+
                             if (dsMin.Tables.Count > 0)
                                 break;
                             Thread.Sleep(1000);
@@ -2861,7 +2865,7 @@ namespace AWSAPI
                         for (int j = 0; j < 3; j++)
                         {
                             dsMax = ObjDB.sp_MinMaxStationData_Status("rpt_DemoDataReport_MinMaxUnit_NewVMCHistory", StID, fromDate, toDate, "MaxVal", "", "Web");
-                            
+
                             if (dsMax.Tables.Count > 0)
                                 break;
                             Thread.Sleep(1000);
@@ -2959,7 +2963,7 @@ namespace AWSAPI
                             {
                                 if (!EliminatePara.Contains(Parameters[p]))
                                 {
-                                    if(Parameters[p] == "WIND GUST")
+                                    if (Parameters[p] == "WIND GUST")
                                     {
                                         strfinalUnits = strfinalUnits + "," + Units[p] + " / " + DominantWindDir;
                                     }
@@ -2967,14 +2971,14 @@ namespace AWSAPI
                                     {
                                         strfinalUnits = strfinalUnits + "," + Units[p];
                                     }
-                                    
-                                    
-                                    
+
+
+
                                     strfinalPara = strfinalPara + "," + Parameters[p];
                                 }
                             }
 
-                            
+
                             //strfinalUnits = strfinalUnits + "," + "mps";
                             strfinalUnits = strfinalUnits.Replace("Degree", "°").TrimStart(',');
                             finalUnits = strfinalUnits.Replace("C", "°C").Split(',').ToList();
@@ -3061,42 +3065,42 @@ namespace AWSAPI
                         {
 
                             string parameter = maxRow[2].ToString(); // Assuming the parameter is in the first column of dsMax.Tables[0]
-                            
-                                DataRow dr = dtFinal.NewRow();
-                                dtFinal.Rows.Add(dr);
 
-                                int m = dtFinal.Rows.Count - 1; // Index of the newly added row
+                            DataRow dr = dtFinal.NewRow();
+                            dtFinal.Rows.Add(dr);
 
-                                if (ProfileNM == "VMC-AWS-GUJ")
+                            int m = dtFinal.Rows.Count - 1; // Index of the newly added row
+
+                            if (ProfileNM == "VMC-AWS-GUJ")
+                            {
+
+                                dtFinal.Rows[m][0] = parameter.Replace("[", "").Replace("]", "");
+                                if (dtFinal.Rows[m][0].ToString() == "WIND GUST")
                                 {
-                                
-                                    dtFinal.Rows[m][0] = parameter.Replace("[", "").Replace("]", "");
-                                    if(dtFinal.Rows[m][0].ToString() == "WIND GUST")
-                                    {
-                                        dtFinal.Rows[m][0] = "Wind Gust";
-                                    }
-
-                                    if (m < 11)
-                                    {
-                                        DataRow minRows = dsMin.Tables[0].AsEnumerable()
-                                               .FirstOrDefault(row => row.Field<string>("ColumnName") == ""+ parameter +""); ;
-                                        if (minRows != null)
-                                        {
-                                            dtFinal.Rows[m][1] = minRows[0].ToString();
-                                            dtFinal.Rows[m][2] = minRows[1].ToString();
-                                            dtFinal.Rows[m][3] = minRows[3].ToString();
-                                        }
-                                    }
-
-                                    dtFinal.Rows[m][4] = maxRow[0].ToString();
-                                    dtFinal.Rows[m][5] = maxRow[1].ToString();
-                                    dtFinal.Rows[m][6] = maxRow[3].ToString();
-                                    // Assuming finalUnits has the same order as finalPara
-                                    dtFinal.Rows[m][7] = finalUnits[finalPara.IndexOf(parameter.Trim().Replace("[","").Replace("]", ""))];
+                                    dtFinal.Rows[m][0] = "Wind Gust";
                                 }
-                            
+
+                                if (m < 11)
+                                {
+                                    DataRow minRows = dsMin.Tables[0].AsEnumerable()
+                                           .FirstOrDefault(row => row.Field<string>("ColumnName") == "" + parameter + ""); ;
+                                    if (minRows != null)
+                                    {
+                                        dtFinal.Rows[m][1] = minRows[0].ToString();
+                                        dtFinal.Rows[m][2] = minRows[1].ToString();
+                                        dtFinal.Rows[m][3] = minRows[3].ToString();
+                                    }
+                                }
+
+                                dtFinal.Rows[m][4] = maxRow[0].ToString();
+                                dtFinal.Rows[m][5] = maxRow[1].ToString();
+                                dtFinal.Rows[m][6] = maxRow[3].ToString();
+                                // Assuming finalUnits has the same order as finalPara
+                                dtFinal.Rows[m][7] = finalUnits[finalPara.IndexOf(parameter.Trim().Replace("[", "").Replace("]", ""))];
+                            }
+
                         }
-                        
+
 
 
 
@@ -3131,8 +3135,8 @@ namespace AWSAPI
                             #endregion Remove Dynamic COlumn from Forest-GOA-AWS...
                         }
                     }
-                    
-                    else if(ProfileNM == "VMC-NHP-GUJ")
+
+                    else if (ProfileNM == "VMC-NHP-GUJ")
                     {
                         DataSet dsMin = null;
 
@@ -3171,7 +3175,7 @@ namespace AWSAPI
                         string WindGust = "";
                         WindGust = HighWS; // + " mps / " + DominantWindDir;
 
-                  
+
                         string DateHighRain = null, TimeHighRain = null, HighRain = null;
                         string RainTotal = "";
 
@@ -3678,18 +3682,18 @@ namespace AWSAPI
                     }
 
                     Rdetail.Rain24HR = dtStationHR.Rows[0]["15mins RAINFALL"].ToString();*/
- 
+
                     string strQry = @"select  [StationID],sum(try_cast(RTRIM(LTRIM(replace([15mins RAINFALL], ''' + + ''', ''''))) as decimal(18,2))) as CummulativeRain 
                                       from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) where CAST([Date] AS datetime) +CAST([Time] AS datetime) >= '" + yesterDayDT.Trim() + "' and CAST([Date] AS datetime) + CAST([Time] AS datetime) <= '" + CurrDT.Trim() + "' group by StationID";
 
                     DataTable dtRain24HR = ObjDB.FetchDataTable(strQry, "web");
-                    
+
                     if (dtRain24HR.Rows.Count > 0)
                     {
                         Rdetail.Rain24HR = dtRain24HR.Rows[0]["CummulativeRain"].ToString();
-                    } 
+                    }
                 }
-                else if(Profile == "VMC-NHP-GUJ")
+                else if (Profile == "VMC-NHP-GUJ")
                 {
                     CurrDT = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
 
@@ -3735,9 +3739,9 @@ namespace AWSAPI
                 //================================Calculate Current Rate....=========================================================== 
                 #region current Rain rate remove
                 string CurrHRSelQry = "";
-                if(Profile == "VMC-AWS-GUJ")
+                if (Profile == "VMC-AWS-GUJ")
                 {
-                     CurrHRSelQry = "select top 1 Date,Time,[Rain Rate] from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) Where Date = '" + DateTime.Now.Date.ToString("yyyy-MM-dd") + "' order by Date desc,Time desc";
+                    CurrHRSelQry = "select top 1 Date,Time,[Rain Rate] from tbl_StationData_" + StID.Trim() + " WITH (NOLOCK) Where Date = '" + DateTime.Now.Date.ToString("yyyy-MM-dd") + "' order by Date desc,Time desc";
                 }
                 else
                 {
@@ -3881,7 +3885,7 @@ namespace AWSAPI
                                      select new
                                      {
                                          lastHour = row.Field<string>("15mins RainFALL"),
-                                     }).FirstOrDefault(); 
+                                     }).FirstOrDefault();
 
 
                     //Month Total....
@@ -4171,9 +4175,9 @@ namespace AWSAPI
                 string SelectDB = "";
                 if (Profile == "VMC-AWS-GUJ")
                 {
-                     SelectDB = "Select StationID,Date,Time,[15mins RainFALL] From tbl_StationData_" + StID.Trim() + " Where Date = '" + CRDate.Trim() + "' order by Date asc, Time asc";
+                    SelectDB = "Select StationID,Date,Time,[15mins RainFALL] From tbl_StationData_" + StID.Trim() + " Where Date = '" + CRDate.Trim() + "' order by Date asc, Time asc";
                 }
-                else if(Profile == "VMC-NHP-GUJ")
+                else if (Profile == "VMC-NHP-GUJ")
                 {
                     SelectDB = "Select StationID,Date,Time,[Hourly Rainfall] From tbl_StationData_" + StID.Trim() + " Where Date = '" + CRDate.Trim() + "' order by Date asc, Time asc";
                 }
@@ -4197,7 +4201,7 @@ namespace AWSAPI
                     {
                         #region 15 min summation remove logic is delete
                         double HRain = 000.0;
-                        if(Profile == "VMC-NHP-GUJ")
+                        if (Profile == "VMC-NHP-GUJ")
                         {
                             string stHRain = funRemoveSummationHR(dsHRain, StID, r); // <-- dt.Rows[r][HR] -- 15 Min summation remove
 
@@ -4212,7 +4216,7 @@ namespace AWSAPI
                             HRain = Convert.ToDouble(dsHRain.Tables[0].Rows[r]["15mins RainFALL"]);
                         }
                         #endregion
-                         
+
                         if (HRain >= 000.5)
                         {
                             if (flgStartDT == false)
