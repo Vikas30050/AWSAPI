@@ -520,8 +520,20 @@ namespace AWSAPI
 
                     for (int j = 0; j < 3; j++)
                     {
-                        dsSTData = ObjDB.FetchData_GenericStation("[DBO].[USP_AWSAPI_GetDataV2]", StID, frDT, toDT, status, "Web");
-                        //dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
+                        if (ProfileName == "VMC-AWS-GUJ")
+                        {
+                            dsSTData = ObjDB.FetchData_GenericStation("[DBO].[USP_AWSAPI_GetDataV2]", StID, frDT, toDT, status, "Web");
+                            for (int i = 0; i < dsSTData.Tables[0].Columns.Count; i++)
+                            {
+                                var columnName = dsSTData.Tables[0].Columns[i].ColumnName;
+                                if (columnName == "ID" || columnName == "Mobile") dsSTData.Tables[0].Columns.RemoveAt(i);
+                            }
+                        }
+                        else
+                        {
+                            dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
+                        }
+
                         if (ProfileName == "VMC-AWS-GUJ")
                         {
                             dsSTData.Tables[0].Columns.Remove("Status");
@@ -564,34 +576,39 @@ namespace AWSAPI
                             {
                                 if (!ProfileName.ToLower().Contains("-arg"))
                                 {
-                                    highTemp = dsSTData.Tables[0].AsEnumerable()
+                                    if (StID == "BDC00001")
+                                    {
+                                        highTemp = dsSTData.Tables[0].AsEnumerable()
                                                 .Where(t => t.Field<string>("AirTemperature") != "--")
                                                 .Select(t => Convert.ToDouble(t.Field<string>("AirTemperature")))
                                                 .Max();
 
-                                    lowTemp = dsSTData.Tables[0].AsEnumerable()
-                                                .Where(t => t.Field<string>("AirTemperature") != "--")
-                                                .Select(t => Convert.ToDouble(t.Field<string>("AirTemperature")))
-                                                .Min();
+                                        lowTemp = dsSTData.Tables[0].AsEnumerable()
+                                                    .Where(t => t.Field<string>("AirTemperature") != "--")
+                                                    .Select(t => Convert.ToDouble(t.Field<string>("AirTemperature")))
+                                                    .Min();
 
-                                    lowTemp = dsSTData.Tables[1].AsEnumerable()
-                                                .Where(t => t.Field<string>("MinAirTemperature") != "--")
-                                                .Select(t => Convert.ToDouble(t.Field<string>("MinAirTemperature")))
-                                                .FirstOrDefault();
+                                        lowTemp = dsSTData.Tables[1].AsEnumerable()
+                                                    .Where(t => t.Field<string>("MinAirTemperature") != "--")
+                                                    .Select(t => Convert.ToDouble(t.Field<string>("MinAirTemperature")))
+                                                    .FirstOrDefault();
 
-                                    highTemp = dsSTData.Tables[1].AsEnumerable()
-                                                .Where(t => t.Field<string>("MaxAirTemperature") != "--")
-                                                .Select(t => Convert.ToDouble(t.Field<string>("MaxAirTemperature")))
-                                                .FirstOrDefault();
+                                        highTemp = dsSTData.Tables[1].AsEnumerable()
+                                                    .Where(t => t.Field<string>("MaxAirTemperature") != "--")
+                                                    .Select(t => Convert.ToDouble(t.Field<string>("MaxAirTemperature")))
+                                                    .FirstOrDefault();
+                                    }
+                                    else
+                                    {
+                                        highTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
+                                                .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
+                                                .Max(x => x);
 
-                                    //highTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
-                                    //        .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
-                                    //        .Max(x => x);
+                                        lowTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
+                                                .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
+                                                .Min(x => x);
 
-                                    //lowTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
-                                    //        .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
-                                    //        .Min(x => x);
-
+                                    }
 
                                     clsStationGraphDetail stationGraphCurrData = new clsStationGraphDetail();
                                     stationGraphCurrData.Type = "currentdata";
@@ -882,7 +899,6 @@ namespace AWSAPI
 
                                 //string[] strCumRainFinal = new string[dsSTData.Tables[0].Rows.Count];
 
-
                                 string CurrDate = DateTime.Now.ToString("yyyy-MM-dd");
                                 DateTime time = DateTime.ParseExact("08:00", "HH:mm", CultureInfo.InvariantCulture);
 
@@ -1110,7 +1126,14 @@ namespace AWSAPI
                                                         reportDT.Rows[r][c] = "00.0";
                                                     }
 
-                                                    graphBarDataWG.ParameterValue = reportDT.Rows[r]["WIND GUST"].ToString();
+                                                    if (ProfileName == "VMC-AWS-GUJ")
+                                                    {
+                                                        graphBarDataWG.ParameterValue = reportDT.Rows[r]["WindGust"].ToString();
+                                                    }
+                                                    else
+                                                    {
+                                                        graphBarDataWG.ParameterValue = reportDT.Rows[r]["WIND GUST"].ToString();
+                                                    }
                                                     graphBarDataWG.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
                                                     LstgraphBarDataWG.Add(graphBarDataWG);
 
@@ -1521,12 +1544,12 @@ namespace AWSAPI
                         dtCaculativeData = dsSTData.Tables[1];
                     }
 
-                    dtAllData.Columns.Remove("ID");
-                    dtAllData.Columns.Remove("Mobile");
-                    dtAllData.Columns.Remove("PeripheralStatus");
-                    dtAllData.Columns.Remove("CreatedDate");
-                    dtAllData.Columns.Remove("InsertedDate");
-                    dtAllData.Columns.Remove("UpdationDate");
+                    //dtAllData.Columns.Remove("ID");
+                    //dtAllData.Columns.Remove("Mobile");
+                    if (dtAllData.Columns.Contains("PeripheralStatus")) dtAllData.Columns.Remove("PeripheralStatus");
+                    if (dtAllData.Columns.Contains("CreatedDate"))dtAllData.Columns.Remove("CreatedDate");
+                    if (dtAllData.Columns.Contains("InsertedDate"))dtAllData.Columns.Remove("InsertedDate");
+                    if (dtAllData.Columns.Contains("UpdationDate")) dtAllData.Columns.Remove("UpdationDate");
 
                     DataRow dr = dtAllData.NewRow();
                     dtAllData.Rows.Add(dr);
@@ -1592,8 +1615,8 @@ namespace AWSAPI
                     {
                         dtCaculativeData = dsSTData.Tables[1];
                     }
-                    if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
-                    if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
+                    //if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
+                    //if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
                     if (dtAllData.Columns.Contains("PeripheralStatus")) dtAllData.Columns.Remove("PeripheralStatus");
                     if (dtAllData.Columns.Contains("CreatedDate")) dtAllData.Columns.Remove("CreatedDate");
                     if (dtAllData.Columns.Contains("InsertedDate")) dtAllData.Columns.Remove("InsertedDate");
@@ -1667,8 +1690,8 @@ namespace AWSAPI
                     {
                         dtCaculativeData = dsSTData.Tables[1];
                     }
-                    if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
-                    if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
+                    //if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
+                    //if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
                     if (dtAllData.Columns.Contains("PeripheralStatus")) dtAllData.Columns.Remove("PeripheralStatus");
                     if (dtAllData.Columns.Contains("CreatedDate")) dtAllData.Columns.Remove("CreatedDate");
                     if (dtAllData.Columns.Contains("InsertedDate")) dtAllData.Columns.Remove("InsertedDate");
