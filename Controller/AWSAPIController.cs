@@ -1146,9 +1146,7 @@ namespace AWSAPI
                                                         stationGraphDetail.GraphBarDataWG = LstgraphBarDataWG;
                                                     }
                                                 }
-
                                                 graphDetailList.Add(stationGraphDetail);
-
                                             }
                                             else
                                             {
