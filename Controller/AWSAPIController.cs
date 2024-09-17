@@ -576,7 +576,7 @@ namespace AWSAPI
                             {
                                 if (!ProfileName.ToLower().Contains("-arg"))
                                 {
-                                    if (StID == "BDC00001")
+                                    if (ProfileName.Trim() == "VMC-AWS-GUJ")
                                     {
                                         highTemp = dsSTData.Tables[0].AsEnumerable()
                                                 .Where(t => t.Field<string>("AirTemperature") != "--")
