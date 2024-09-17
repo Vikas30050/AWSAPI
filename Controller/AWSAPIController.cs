@@ -1628,8 +1628,8 @@ namespace AWSAPI
                     {
                         dtCaculativeData = dsSTData.Tables[1];
                     }
-                    if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
-                    if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
+                    //if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
+                    //if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
                     if (dtAllData.Columns.Contains("PeripheralStatus")) dtAllData.Columns.Remove("PeripheralStatus");
                     if (dtAllData.Columns.Contains("CreatedDate")) dtAllData.Columns.Remove("CreatedDate");
                     if (dtAllData.Columns.Contains("InsertedDate")) dtAllData.Columns.Remove("InsertedDate");
@@ -1703,8 +1703,8 @@ namespace AWSAPI
                     {
                         dtCaculativeData = dsSTData.Tables[1];
                     }
-                    if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
-                    if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
+                    //if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
+                    //if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
                     if (dtAllData.Columns.Contains("PeripheralStatus")) dtAllData.Columns.Remove("PeripheralStatus");
                     if (dtAllData.Columns.Contains("CreatedDate")) dtAllData.Columns.Remove("CreatedDate");
                     if (dtAllData.Columns.Contains("InsertedDate")) dtAllData.Columns.Remove("InsertedDate");
