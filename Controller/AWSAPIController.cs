@@ -520,8 +520,20 @@ namespace AWSAPI
 
                     for (int j = 0; j < 3; j++)
                     {
-                        dsSTData = ObjDB.FetchData_GenericStation("[DBO].[USP_AWSAPI_GetDataV2]", StID, frDT, toDT, status, "Web");
-                        //dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
+                        if (ProfileName == "VMC-AWS-GUJ")
+                        {
+                            dsSTData = ObjDB.FetchData_GenericStation("[DBO].[USP_AWSAPI_GetDataV2]", StID, frDT, toDT, status, "Web");
+                            for (int i = 0; i < dsSTData.Tables[0].Columns.Count; i++)
+                            {
+                                var columnName = dsSTData.Tables[0].Columns[i].ColumnName;
+                                if (columnName == "ID" || columnName == "Mobile") dsSTData.Tables[0].Columns.RemoveAt(i);
+                            }
+                        }
+                        else
+                        {
+                            dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
+                        }
+
                         if (ProfileName == "VMC-AWS-GUJ")
                         {
                             dsSTData.Tables[0].Columns.Remove("Status");
@@ -564,34 +576,39 @@ namespace AWSAPI
                             {
                                 if (!ProfileName.ToLower().Contains("-arg"))
                                 {
-                                    highTemp = dsSTData.Tables[0].AsEnumerable()
+                                    if (StID == "BDC00001")
+                                    {
+                                        highTemp = dsSTData.Tables[0].AsEnumerable()
                                                 .Where(t => t.Field<string>("AirTemperature") != "--")
                                                 .Select(t => Convert.ToDouble(t.Field<string>("AirTemperature")))
                                                 .Max();
 
-                                    lowTemp = dsSTData.Tables[0].AsEnumerable()
-                                                .Where(t => t.Field<string>("AirTemperature") != "--")
-                                                .Select(t => Convert.ToDouble(t.Field<string>("AirTemperature")))
-                                                .Min();
+                                        lowTemp = dsSTData.Tables[0].AsEnumerable()
+                                                    .Where(t => t.Field<string>("AirTemperature") != "--")
+                                                    .Select(t => Convert.ToDouble(t.Field<string>("AirTemperature")))
+                                                    .Min();
 
-                                    lowTemp = dsSTData.Tables[1].AsEnumerable()
-                                                .Where(t => t.Field<string>("MinAirTemperature") != "--")
-                                                .Select(t => Convert.ToDouble(t.Field<string>("MinAirTemperature")))
-                                                .FirstOrDefault();
+                                        lowTemp = dsSTData.Tables[1].AsEnumerable()
+                                                    .Where(t => t.Field<string>("MinAirTemperature") != "--")
+                                                    .Select(t => Convert.ToDouble(t.Field<string>("MinAirTemperature")))
+                                                    .FirstOrDefault();
 
-                                    highTemp = dsSTData.Tables[1].AsEnumerable()
-                                                .Where(t => t.Field<string>("MaxAirTemperature") != "--")
-                                                .Select(t => Convert.ToDouble(t.Field<string>("MaxAirTemperature")))
-                                                .FirstOrDefault();
+                                        highTemp = dsSTData.Tables[1].AsEnumerable()
+                                                    .Where(t => t.Field<string>("MaxAirTemperature") != "--")
+                                                    .Select(t => Convert.ToDouble(t.Field<string>("MaxAirTemperature")))
+                                                    .FirstOrDefault();
+                                    }
+                                    else
+                                    {
+                                        highTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
+                                                .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
+                                                .Max(x => x);
 
-                                    //highTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
-                                    //        .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
-                                    //        .Max(x => x);
+                                        lowTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
+                                                .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
+                                                .Min(x => x);
 
-                                    //lowTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
-                                    //        .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
-                                    //        .Min(x => x);
-
+                                    }
 
                                     clsStationGraphDetail stationGraphCurrData = new clsStationGraphDetail();
                                     stationGraphCurrData.Type = "currentdata";
@@ -882,7 +899,6 @@ namespace AWSAPI
 
                                 //string[] strCumRainFinal = new string[dsSTData.Tables[0].Rows.Count];
 
-
                                 string CurrDate = DateTime.Now.ToString("yyyy-MM-dd");
                                 DateTime time = DateTime.ParseExact("08:00", "HH:mm", CultureInfo.InvariantCulture);
 
@@ -989,7 +1005,8 @@ namespace AWSAPI
                                     graphBarData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
                                     graphBarData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
                                     //Cummulative Rain...
-                                    graphBarData.ParameterValue = finalHR; //dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
+                                    graphBarData.ParameterValue = !string.IsNullOrEmpty(finalHR) ? finalHR : "000.0"; //dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
+                                    //graphBarData.ParameterValue = finalHR; //dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString();
                                     graphBarData.ParameterUnit = "mm";
                                     LstgraphBarCummData.Add(graphBarData);
                                     stationGraphCummRain.GraphBarData = LstgraphBarCummData;
@@ -1091,30 +1108,43 @@ namespace AWSAPI
 
                                                 for (int r = 0; r < reportDT.Rows.Count; r++)
                                                 {
-                                                    clsGraphData graphBarData = new clsGraphData();
-                                                    graphBarData.Date = reportDT.Rows[r]["Date"].ToString();
-                                                    graphBarData.Time = reportDT.Rows[r]["Time"].ToString();
-                                                    graphBarData.ParameterValue = reportDT.Rows[r][c].ToString();
-                                                    graphBarData.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
-                                                    LstgraphBarData.Add(graphBarData);
-
-                                                    stationGraphDetail.GraphBarData = LstgraphBarData;
-
-                                                    clsGraphData graphBarDataWG = new clsGraphData();
-                                                    graphBarDataWG.Date = reportDT.Rows[r]["Date"].ToString();
-                                                    graphBarDataWG.Time = reportDT.Rows[r]["Time"].ToString();
-
-                                                    //Change by vikas --> 10-Mar-2023
-                                                    if (reportDT.Rows[r][c].ToString().Contains("--"))
+                                                    if (reportDT.Rows[r][2].ToString() == "Min" || reportDT.Rows[r][2].ToString() == "Max" || reportDT.Rows[r][2].ToString() == "Heat D-D" || reportDT.Rows[r][2].ToString() == "Cool D-D")
                                                     {
-                                                        reportDT.Rows[r][c] = "00.0";
                                                     }
+                                                    else
+                                                    {
+                                                        clsGraphData graphBarData = new clsGraphData();
+                                                        graphBarData.Date = reportDT.Rows[r]["Date"].ToString();
+                                                        graphBarData.Time = reportDT.Rows[r]["Time"].ToString();
+                                                        graphBarData.ParameterValue = reportDT.Rows[r][c].ToString();
+                                                        graphBarData.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
+                                                        LstgraphBarData.Add(graphBarData);
 
-                                                    graphBarDataWG.ParameterValue = reportDT.Rows[r]["WIND GUST"].ToString();
-                                                    graphBarDataWG.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
-                                                    LstgraphBarDataWG.Add(graphBarDataWG);
+                                                        stationGraphDetail.GraphBarData = LstgraphBarData;
 
-                                                    stationGraphDetail.GraphBarDataWG = LstgraphBarDataWG;
+                                                        clsGraphData graphBarDataWG = new clsGraphData();
+                                                        graphBarDataWG.Date = reportDT.Rows[r]["Date"].ToString();
+                                                        graphBarDataWG.Time = reportDT.Rows[r]["Time"].ToString();
+
+                                                        //Change by vikas --> 10-Mar-2023
+                                                        if (reportDT.Rows[r][c].ToString().Contains("--"))
+                                                        {
+                                                            reportDT.Rows[r][c] = "00.0";
+                                                        }
+
+                                                        if (ProfileName == "VMC-AWS-GUJ")
+                                                        {
+                                                            graphBarDataWG.ParameterValue = reportDT.Rows[r]["WindGust"].ToString();
+                                                        }
+                                                        else
+                                                        {
+                                                            graphBarDataWG.ParameterValue = reportDT.Rows[r]["WIND GUST"].ToString();
+                                                        }
+                                                        graphBarDataWG.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
+                                                        LstgraphBarDataWG.Add(graphBarDataWG);
+
+                                                        stationGraphDetail.GraphBarDataWG = LstgraphBarDataWG;
+                                                    }
                                                 }
 
                                                 graphDetailList.Add(stationGraphDetail);
@@ -1158,14 +1188,20 @@ namespace AWSAPI
 
                                                 for (int r = 0; r < reportDT.Rows.Count; r++)
                                                 {
-                                                    clsGraphData graphData = new clsGraphData();
-                                                    graphData.Date = reportDT.Rows[r]["Date"].ToString();
-                                                    graphData.Time = reportDT.Rows[r]["Time"].ToString();
-                                                    graphData.ParameterValue = reportDT.Rows[r][c].ToString();
-                                                    graphData.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
-                                                    LstgraphData.Add(graphData);
+                                                    if (reportDT.Rows[r][2].ToString() == "Min" || reportDT.Rows[r][2].ToString() == "Max" || reportDT.Rows[r][2].ToString() == "Heat D-D" || reportDT.Rows[r][2].ToString() == "Cool D-D")
+                                                    {
+                                                    }
+                                                    else
+                                                    {
+                                                        clsGraphData graphData = new clsGraphData();
+                                                        graphData.Date = reportDT.Rows[r]["Date"].ToString();
+                                                        graphData.Time = reportDT.Rows[r]["Time"].ToString();
+                                                        graphData.ParameterValue = reportDT.Rows[r][c].ToString();
+                                                        graphData.ParameterUnit = NewUnit1[c] == "NA" ? "" : NewUnit1[c];
+                                                        LstgraphData.Add(graphData);
 
-                                                    stationGraphDetail.GraphData = LstgraphData;
+                                                        stationGraphDetail.GraphData = LstgraphData;
+                                                    }
                                                 }
 
                                                 graphDetailList.Add(stationGraphDetail);
@@ -1521,12 +1557,12 @@ namespace AWSAPI
                         dtCaculativeData = dsSTData.Tables[1];
                     }
 
-                    dtAllData.Columns.Remove("ID");
-                    dtAllData.Columns.Remove("Mobile");
-                    dtAllData.Columns.Remove("PeripheralStatus");
-                    dtAllData.Columns.Remove("CreatedDate");
-                    dtAllData.Columns.Remove("InsertedDate");
-                    dtAllData.Columns.Remove("UpdationDate");
+                    if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
+                    if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
+                    if (dtAllData.Columns.Contains("PeripheralStatus")) dtAllData.Columns.Remove("PeripheralStatus");
+                    if (dtAllData.Columns.Contains("CreatedDate")) dtAllData.Columns.Remove("CreatedDate");
+                    if (dtAllData.Columns.Contains("InsertedDate")) dtAllData.Columns.Remove("InsertedDate");
+                    if (dtAllData.Columns.Contains("UpdationDate")) dtAllData.Columns.Remove("UpdationDate");
 
                     DataRow dr = dtAllData.NewRow();
                     dtAllData.Rows.Add(dr);
@@ -2082,17 +2118,17 @@ namespace AWSAPI
 
             else if (ParaName.ToLower().Contains("dew"))
                 type = "dew point";
-            else if (ParaName.ToLower().Contains("wind run"))
+            else if (ParaName.ToLower().Contains("wind run") || ParaName.ToLower().Contains("windrun"))
                 type = "wind run";
-            else if (ParaName.ToLower().Contains("wind chill"))
+            else if (ParaName.ToLower().Contains("wind chill") || ParaName.ToLower().Contains("windchill"))
                 type = "wind chill";
-            else if (ParaName.ToLower().Contains("heat index"))
+            else if (ParaName.ToLower().Contains("heat index") || ParaName.ToLower().Contains("heatindex"))
                 type = "heat index";
-            else if (ParaName.ToLower().Contains("thw index"))
+            else if (ParaName.ToLower().Contains("thw index") || ParaName.ToLower().Contains("thwindex"))
                 type = "thw index";
-            else if (ParaName.ToLower().Contains("wind gust"))
+            else if (ParaName.ToLower().Contains("wind gust") || ParaName.ToLower().Contains("wind gust"))
                 type = "wind gust";
-            else if (ParaName.ToLower().Contains("rain rate"))
+            else if (ParaName.ToLower().Contains("rain rate") || ParaName.ToLower().Contains("rainrate"))
                 type = "rain rate";
 
             return type;
