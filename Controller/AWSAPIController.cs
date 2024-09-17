@@ -520,7 +520,8 @@ namespace AWSAPI
 
                     for (int j = 0; j < 3; j++)
                     {
-                        dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
+                        dsSTData = ObjDB.FetchData_GenericStation("[DBO].[USP_AWSAPI_GetDataV2]", StID, frDT, toDT, status, "Web");
+                        //dsSTData = ObjDB.FetchData_GenericStation("[AWSAPI].[GenericPastStationData]", StID, frDT, toDT, status, "Web");
                         if (ProfileName == "VMC-AWS-GUJ")
                         {
                             dsSTData.Tables[0].Columns.Remove("Status");
@@ -563,13 +564,33 @@ namespace AWSAPI
                             {
                                 if (!ProfileName.ToLower().Contains("-arg"))
                                 {
-                                    highTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
-                                            .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
-                                            .Max(x => x);
+                                    highTemp = dsSTData.Tables[0].AsEnumerable()
+                                                .Where(t => t.Field<string>("AirTemperature") != "--")
+                                                .Select(t => Convert.ToDouble(t.Field<string>("AirTemperature")))
+                                                .Max();
 
-                                    lowTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
-                                            .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
-                                            .Min(x => x);
+                                    lowTemp = dsSTData.Tables[0].AsEnumerable()
+                                                .Where(t => t.Field<string>("AirTemperature") != "--")
+                                                .Select(t => Convert.ToDouble(t.Field<string>("AirTemperature")))
+                                                .Min();
+
+                                    lowTemp = dsSTData.Tables[1].AsEnumerable()
+                                                .Where(t => t.Field<string>("MinAirTemperature") != "--")
+                                                .Select(t => Convert.ToDouble(t.Field<string>("MinAirTemperature")))
+                                                .FirstOrDefault();
+
+                                    highTemp = dsSTData.Tables[1].AsEnumerable()
+                                                .Where(t => t.Field<string>("MaxAirTemperature") != "--")
+                                                .Select(t => Convert.ToDouble(t.Field<string>("MaxAirTemperature")))
+                                                .FirstOrDefault();
+
+                                    //highTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
+                                    //        .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
+                                    //        .Max(x => x);
+
+                                    //lowTemp = dsSTData.Tables[0].AsEnumerable().Where(r => r.Field<string>("Air Temperature") != "--")
+                                    //        .Select(x => Convert.ToDouble(x.Field<string>("Air Temperature")))
+                                    //        .Min(x => x);
 
 
                                     clsStationGraphDetail stationGraphCurrData = new clsStationGraphDetail();
@@ -956,7 +977,7 @@ namespace AWSAPI
                                     clsGraphData graphData = new clsGraphData();
                                     graphData.Date = dsSTData.Tables[0].Rows[s]["Date"].ToString();
                                     graphData.Time = dsSTData.Tables[0].Rows[s]["Time"].ToString();
-                                    graphData.ParameterValue = dsSTData.Tables[0].Rows[s]["Daily Rain"].ToString(); //finalHR;
+                                    graphData.ParameterValue = dsSTData.Tables[0].Rows[s]["DailyRain"].ToString(); //finalHR;
                                     graphData.ParameterUnit = "mm";
                                     LstgraphCummData.Add(graphData);
                                     stationGraphCummRain.GraphData = LstgraphCummData;
@@ -1015,31 +1036,36 @@ namespace AWSAPI
 
                                 graphDetailList.Add(stationGraphCummRain);
 
-                                finalcolList.Add("Dew Point");
-                                finalcolList.Add("Wind Run");
-                                finalcolList.Add("Wind Chill");
-                                finalcolList.Add("Heat Index");
-                                finalcolList.Add("THW Index");
+                                //finalcolList.Add("Dew Point");
+                                //finalcolList.Add("Wind Run");
+                                //finalcolList.Add("Wind Chill");
+                                //finalcolList.Add("Heat Index");
+                                //finalcolList.Add("THW Index");
 
                                 //"Dew Point","Wind Run","Wind Chill","Heat Index","THW Index"
                                 stUnit += "°C,m,(kgcal/m2/h),°C,°C";
 
                                 List<string> NewUnit1 = stUnit.Split(',').ToList();
                                 NewUnit1.RemoveAt(3);
-                                DataTable reportDT = funVMCDataSet(StID, frDT, toDT, status);
+                                var dsStationData = dsSTData.Copy();
+                                DataTable reportDT1 = funVMCDataSetV2(dsSTData);
+                                DataTable reportDT = reportDT1.Copy();
+                                var reportMin = funGetMinValueV2(dsStationData);
+                                var reportMax = funGetMaxValueV2(dsStationData);
 
-                                DataSet reportMin = funMinVal(reportDT, StID, frDT, toDT, status);
+                                //DataTable reportDT1 = funVMCDataSet(StID, frDT, toDT, status);
+                                //DataSet reportMin1 = funMinVal(reportDT, StID, frDT, toDT, status);
+                                //DataSet reportMax1 = funMaxVal(reportDT, StID, frDT, toDT, status);
 
-                                DataSet reportMax = funMaxVal(reportDT, StID, frDT, toDT, status);
-
-                                if (reportDT.Rows.Count > 0)
+                                if (reportDT.Rows.Count > 0 && reportMin != null && reportMax != null)
                                 {
                                     for (int c = 3; c < reportDT.Columns.Count; c++)
                                     {
 
-                                        if (finalcolList[c] != "15mins RAINFALL" && finalcolList[c] != "Daily Rain" && finalcolList[c] != "HIGH DIRECTION" && finalcolList[c] != "WIND GUST" && finalcolList[c] != "RAIN RATE")
+                                        //if (finalcolList[c] != "15mins RAINFALL" && finalcolList[c] != "Daily Rain" && finalcolList[c] != "HIGH DIRECTION" && finalcolList[c] != "WIND GUST" && finalcolList[c] != "RAIN RATE")
+                                        if (finalcolList[c] != "RainFall" && finalcolList[c] != "DailyRain" && finalcolList[c] != "HighDirection" && finalcolList[c] != "WindGust" && finalcolList[c] != "RainRate")
                                         {
-                                            if (finalcolList[c] == "Wind Speed")
+                                            if (finalcolList[c] == "WindSpeed")
                                             {
                                                 clsStationGraphDetail stationGraphDetail = new clsStationGraphDetail();
 
@@ -1052,13 +1078,13 @@ namespace AWSAPI
                                                 stationGraphDetail.xAxisTitle = "Time";
                                                 stationGraphDetail.yAxisTile = finalcolList[c].Trim();
 
-                                                stationGraphDetail.MinDate = reportMin.Tables[0].Rows[c - 3][0].ToString();
-                                                stationGraphDetail.MinTime = reportMin.Tables[0].Rows[c - 3][1].ToString();
-                                                stationGraphDetail.MinValue = reportMin.Tables[0].Rows[c - 3][2].ToString();
+                                                stationGraphDetail.MinDate = reportMin.Rows[c - 3][0].ToString();
+                                                stationGraphDetail.MinTime = reportMin.Rows[c - 3][1].ToString();
+                                                stationGraphDetail.MinValue = reportMin.Rows[c - 3][2].ToString();
 
-                                                stationGraphDetail.MaxDate = reportMax.Tables[0].Rows[c - 3][0].ToString();
-                                                stationGraphDetail.MaxTime = reportMax.Tables[0].Rows[c - 3][1].ToString();
-                                                stationGraphDetail.MaxValue = reportMax.Tables[0].Rows[c - 3][2].ToString();
+                                                stationGraphDetail.MaxDate = reportMax.Rows[c - 3][0].ToString();
+                                                stationGraphDetail.MaxTime = reportMax.Rows[c - 3][1].ToString();
+                                                stationGraphDetail.MaxValue = reportMax.Rows[c - 3][2].ToString();
 
                                                 List<clsGraphData> LstgraphBarData = new List<clsGraphData>();
                                                 List<clsGraphData> LstgraphBarDataWG = new List<clsGraphData>();
@@ -1108,13 +1134,13 @@ namespace AWSAPI
 
                                                 if (!finalcolList[c].ToLower().Contains("direction"))
                                                 {
-                                                    stationGraphDetail.MinDate = reportMin.Tables[0].Rows[c - 3][0].ToString();
-                                                    stationGraphDetail.MinTime = reportMin.Tables[0].Rows[c - 3][1].ToString();
-                                                    stationGraphDetail.MinValue = reportMin.Tables[0].Rows[c - 3][2].ToString();
+                                                    stationGraphDetail.MinDate = reportMin.Rows[c - 3][0].ToString();
+                                                    stationGraphDetail.MinTime = reportMin.Rows[c - 3][1].ToString();
+                                                    stationGraphDetail.MinValue = reportMin.Rows[c - 3][2].ToString();
 
-                                                    stationGraphDetail.MaxDate = reportMax.Tables[0].Rows[c - 3][0].ToString();
-                                                    stationGraphDetail.MaxTime = reportMax.Tables[0].Rows[c - 3][1].ToString();
-                                                    stationGraphDetail.MaxValue = reportMax.Tables[0].Rows[c - 3][2].ToString();
+                                                    stationGraphDetail.MaxDate = reportMax.Rows[c - 3][0].ToString();
+                                                    stationGraphDetail.MaxTime = reportMax.Rows[c - 3][1].ToString();
+                                                    stationGraphDetail.MaxValue = reportMax.Rows[c - 3][2].ToString();
                                                 }
                                                 else
                                                 {
@@ -1479,6 +1505,218 @@ namespace AWSAPI
             }
 
 
+        }
+
+        public DataTable funVMCDataSetV2(DataSet dsSTData)
+        {
+            var dtAllData = new DataTable();
+            var dtCaculativeData = new DataTable();
+            try
+            {
+                if (dsSTData != null && dsSTData.Tables.Count > 0)
+                {
+                    dtAllData = dsSTData.Tables[0];
+                    if (dsSTData.Tables.Count > 1)
+                    {
+                        dtCaculativeData = dsSTData.Tables[1];
+                    }
+
+                    dtAllData.Columns.Remove("ID");
+                    dtAllData.Columns.Remove("Mobile");
+                    dtAllData.Columns.Remove("PeripheralStatus");
+                    dtAllData.Columns.Remove("CreatedDate");
+                    dtAllData.Columns.Remove("InsertedDate");
+                    dtAllData.Columns.Remove("UpdationDate");
+
+                    DataRow dr = dtAllData.NewRow();
+                    dtAllData.Rows.Add(dr);
+                    dtAllData.Rows[dtAllData.Rows.Count - 1][2] = "Min";
+                    DataRow dr1 = dtAllData.NewRow();
+                    dtAllData.Rows.Add(dr1);
+                    dtAllData.Rows[dtAllData.Rows.Count - 1][2] = "Max";
+
+                    for (int i = 3; i < dtAllData.Columns.Count - 1; i++)
+                    {
+                        var headerName = dtAllData.Columns[i].ColumnName;
+                        var minHeaderName = "Min" + dtAllData.Columns[i].ColumnName;
+
+                        dtAllData.Rows[dtAllData.Rows.Count - 2][headerName] = Convert.ToString(dtCaculativeData.Rows[0][minHeaderName]);
+
+                        var maxHeaderName = "Max" + dtAllData.Columns[i].ColumnName;
+                        dtAllData.Rows[dtAllData.Rows.Count - 1][headerName] = Convert.ToString(dtCaculativeData.Rows[0][maxHeaderName]);
+                    }
+
+                    DataRow dr2 = dtAllData.NewRow();
+                    dtAllData.Rows.Add(dr2);
+                    dtAllData.Rows[dtAllData.Rows.Count - 1][2] = "Heat D-D";
+                    DataRow dr3 = dtAllData.NewRow();
+                    dtAllData.Rows.Add(dr3);
+                    dtAllData.Rows[dtAllData.Rows.Count - 1][2] = "Cool D-D";
+
+                    dtAllData.Rows[dtAllData.Rows.Count - 2][3] = Convert.ToString(dtCaculativeData.Rows[0]["HeatDD"]);
+                    dtAllData.Rows[dtAllData.Rows.Count - 1][3] = Convert.ToString(dtCaculativeData.Rows[0]["CoolDD"]);
+
+                    return dtAllData;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            catch (Exception x)
+            {
+                return null;
+            }
+        }
+
+        public DataTable funGetMinValueV2(DataSet dsSTData)
+        {
+            var totalRowCount = dsSTData.Tables[0].Rows.Count;
+            for (int i = dsSTData.Tables[0].Rows.Count; i > 0; i--)
+            {
+                var cellData = dsSTData.Tables[0].Rows[i - 1]["Time"].ToString();
+                if (cellData == "Min" || cellData == "Max" || cellData == "Heat D-D" || cellData == "Cool D-D")
+                {
+                    dsSTData.Tables[0].Rows.RemoveAt(i - 1);
+                }
+            }
+
+            var dtAllData = new DataTable();
+            var dtCaculativeData = new DataTable();
+            try
+            {
+                if (dsSTData != null && dsSTData.Tables.Count > 0)
+                {
+                    dtAllData = dsSTData.Tables[0];
+                    if (dsSTData.Tables.Count > 1)
+                    {
+                        dtCaculativeData = dsSTData.Tables[1];
+                    }
+                    if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
+                    if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
+                    if (dtAllData.Columns.Contains("PeripheralStatus")) dtAllData.Columns.Remove("PeripheralStatus");
+                    if (dtAllData.Columns.Contains("CreatedDate")) dtAllData.Columns.Remove("CreatedDate");
+                    if (dtAllData.Columns.Contains("InsertedDate")) dtAllData.Columns.Remove("InsertedDate");
+                    if (dtAllData.Columns.Contains("UpdationDate")) dtAllData.Columns.Remove("UpdationDate");
+
+                    DataTable dtData = new DataTable();
+                    dtData.Columns.Add("Date", typeof(string));
+                    dtData.Columns.Add("Time", typeof(string));
+                    dtData.Columns.Add("minVal", typeof(string));
+
+                    for (int i = 3; i < dtAllData.Columns.Count; i++)
+                    {
+                        var columnName = dtAllData.Columns[i].ColumnName;
+                        var minColumnName = "Min" + dtAllData.Columns[i].ColumnName;
+
+                        var minValue = Convert.ToString(dtCaculativeData.Rows[0][minColumnName]);
+
+                        var minData = dtAllData.AsEnumerable()
+                            .Where(row => Convert.ToString(row.Field<string>("Time")) != "Min"
+                            && Convert.ToString(row.Field<string>(columnName)) == minValue)
+                            .Select(t => new
+                            {
+                                Date = Convert.ToString(t.Field<string>("Date")),
+                                Time = Convert.ToString(t.Field<string>("Time")),
+                                Value = Convert.ToString(t.Field<string>(columnName))
+                            })
+                            .OrderBy(t => t.Date)
+                            .ThenBy(t => t.Time)
+                            .FirstOrDefault();
+
+                        if (minData != null)
+                        {
+                            DataRow drData = dtData.NewRow();
+                            drData["Date"] = minData.Date;
+                            drData["Time"] = minData.Time;
+                            drData["minVal"] = minValue;
+                            dtData.Rows.Add(drData);
+                        }
+                    }
+                    return dtData;
+                }
+                else
+                    return null;
+            }
+            catch (Exception x)
+            {
+                return null;
+            }
+        }
+
+        public DataTable funGetMaxValueV2(DataSet dsSTData)
+        {
+            var totalRowCount = dsSTData.Tables[0].Rows.Count;
+            for (int i = dsSTData.Tables[0].Rows.Count; i > 0; i--)
+            {
+                var cellData = dsSTData.Tables[0].Rows[i - 1]["Time"].ToString();
+                if (cellData == "Min" || cellData == "Max" || cellData == "Heat D-D" || cellData == "Cool D-D")
+                {
+                    dsSTData.Tables[0].Rows.RemoveAt(i - 1);
+                }
+            }
+
+            var dtAllData = new DataTable();
+            var dtCaculativeData = new DataTable();
+            try
+            {
+                if (dsSTData != null && dsSTData.Tables.Count > 0)
+                {
+                    dtAllData = dsSTData.Tables[0];
+                    if (dsSTData.Tables.Count > 1)
+                    {
+                        dtCaculativeData = dsSTData.Tables[1];
+                    }
+                    if (dtAllData.Columns.Contains("ID")) dtAllData.Columns.Remove("ID");
+                    if (dtAllData.Columns.Contains("Mobile")) dtAllData.Columns.Remove("Mobile");
+                    if (dtAllData.Columns.Contains("PeripheralStatus")) dtAllData.Columns.Remove("PeripheralStatus");
+                    if (dtAllData.Columns.Contains("CreatedDate")) dtAllData.Columns.Remove("CreatedDate");
+                    if (dtAllData.Columns.Contains("InsertedDate")) dtAllData.Columns.Remove("InsertedDate");
+                    if (dtAllData.Columns.Contains("UpdationDate")) dtAllData.Columns.Remove("UpdationDate");
+
+                    DataTable dtData = new DataTable();
+                    dtData.Columns.Add("Date", typeof(string));
+                    dtData.Columns.Add("Time", typeof(string));
+                    dtData.Columns.Add("maxVal", typeof(string));
+
+                    for (int i = 3; i < dtAllData.Columns.Count; i++)
+                    {
+                        var columnName = dtAllData.Columns[i].ColumnName;
+                        var maxColumnName = "Max" + dtAllData.Columns[i].ColumnName;
+
+                        var maxValue = Convert.ToString(dtCaculativeData.Rows[0][maxColumnName]);
+
+                        var maxData = dtAllData.AsEnumerable()
+                            .Where(row => Convert.ToString(row.Field<string>("Time")) != "Max"
+                            && Convert.ToString(row.Field<string>(columnName)) == maxValue)
+                            .Select(t => new
+                            {
+                                Date = Convert.ToString(t.Field<string>("Date")),
+                                Time = Convert.ToString(t.Field<string>("Time")),
+                                Value = Convert.ToString(t.Field<string>(columnName))
+                            })
+                            .OrderBy(t => t.Date)
+                            .ThenBy(t => t.Time)
+                            .LastOrDefault();
+
+                        if (maxData != null)
+                        {
+                            DataRow drData = dtData.NewRow();
+                            drData["Date"] = maxData.Date;
+                            drData["Time"] = maxData.Time;
+                            drData["maxVal"] = maxValue;
+                            dtData.Rows.Add(drData);
+                        }
+                    }
+                    return dtData;
+                }
+                else
+                    return null;
+            }
+            catch (Exception x)
+            {
+                return null;
+            }
         }
 
         public DataSet funMinVal(DataTable reportDT, string StID, string frDT, string toDT, string status)
